@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from models.request_models import GuideRequest
-from models.response_models import GuideResponse, ErrorResponse
-from crews.recycling_crew import RecyclingCrew  # Direct import, no orchestrator
+from ..models.request_models import GuideRequest
+from  ..models.response_models import GuideResponse, ErrorResponse
+from ..crews.recycling_crew import RecyclingCrew  # Direct import, no orchestrator
 
 # Create router for this specific module
 router = APIRouter()
