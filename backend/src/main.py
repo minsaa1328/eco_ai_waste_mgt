@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.recycling import router as recycling_router  # Direct import
+from api.awareness import router as awareness_router
 import os
 from dotenv import load_dotenv
 
@@ -24,6 +25,7 @@ app.add_middleware(
 
 # Include only the recycling router for now
 app.include_router(recycling_router, prefix="/api/v1/recycling", tags=["Recycling"])
+app.include_router(awareness_router, prefix="/awareness", tags=["awareness"])
 
 @app.get("/")
 def read_root():

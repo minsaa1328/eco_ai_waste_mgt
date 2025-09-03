@@ -2,9 +2,133 @@ import streamlit as st
 import requests
 import json
 
+# Configuration - API endpoints (CORRECTED)
+BASE_URL = "http://localhost:8000"  # Removed /api/v1
+
+
+def get_awareness_message():
+    """Call the Awareness API and display the message"""
+    try:
+        with st.spinner("💡 Generating awareness message..."):
+            response = requests.get(
+                f"{BASE_URL}/awareness/quick",  # Correct endpoint
+                headers={"Content-Type": "application/json"},
+                timeout=15
+            )
+            if response.status_code == 200:
+                data = response.json()
+                st.success("✅ Awareness Message Generated!")
+                st.markdown('<div class="guide-box">', unsafe_allow_html=True)
+                st.markdown(data.get("message", "No message received"))
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.error(f"❌ Error fetching message: HTTP {response.status_code}")
+    except requests.exceptions.ConnectionError:
+        st.error("⚠ Cannot connect to Awareness API. Make sure backend is running on port 8000")
+    except requests.exceptions.Timeout:
+        st.error("⏱ Awareness request timed out. Try again.")
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+
+
+def get_recycling_guide(waste_category, location):
+    """Call the recycling API and display results"""
+    try:
+        with st.spinner(f"🧠 Getting recycling guide for {waste_category}..."):
+            # Prepare the request data
+            payload = {"waste_category": waste_category}
+            if location:
+                payload["user_location"] = location
+
+            # Make API call
+            response = requests.post(
+                f"{BASE_URL}/api/v1/recycling",  # Correct endpoint
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                display_results(data, waste_category)
+            else:
+                handle_error(response)
+
+    except requests.exceptions.ConnectionError:
+        st.error("""
+        *⚠ Cannot connect to the server*
+        - Make sure the backend is running on port 8000
+        - Run this command: python main.py in your backend directory
+        """)
+    except requests.exceptions.Timeout:
+        st.error("⏱ The request timed out. Please try again.")
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+
+
+def display_results(data, waste_category):
+    """Display the recycling guide results"""
+    st.success(f"✅ Successfully generated recycling guide for {waste_category}")
+
+    # Main results columns
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.markdown('<div class="success-box">', unsafe_allow_html=True)
+        st.markdown(f"📦 Material Type:** {data.get('category', waste_category).title()}")
+        st.markdown("📊 Status:** Analysis Complete")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Quick actions
+        st.markdown("### 🚀 Quick Actions")
+        if st.button("📋 Copy to Clipboard", key="copy_btn"):
+            st.session_state.copied_text = data['guide']
+            st.success("Copied to clipboard!")
+
+        if st.button("🔄 Analyze Another Material", key="refresh_btn"):
+            st.rerun()
+
+    with col2:
+        st.markdown("### 📝 Recycling Guide")
+        st.markdown('<div class="guide-box">', unsafe_allow_html=True)
+        st.markdown(data['guide'])
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Additional information
+    with st.expander("ℹ About This Guidance", expanded=False):
+        st.info("""
+        *How this works:*
+        - AI-powered recycling guidance based on waste type
+        - Provides preparation steps, disposal methods, and common mistakes
+        - Includes environmental impact information
+        - Location-specific advice when provided
+        """)
+
+
+def handle_error(response):
+    """Handle different error responses"""
+    try:
+        error_data = response.json()
+        error_detail = error_data.get('detail', {})
+
+        if isinstance(error_detail, dict):
+            st.error(f"""
+            *❌ Error: {error_detail.get('error_type', 'Unknown Error')}*
+            {error_detail.get('detail', 'No details provided')}
+            """)
+        else:
+            st.error(f"❌ Server Error:** {error_detail}")
+
+    except json.JSONDecodeError:
+        st.error(f"""
+        *❌ Server Error (HTTP {response.status_code})*
+        The server returned an invalid response. Please check if the backend is running properly.
+        """)
+
+
 st.set_page_config(
-    page_title="♻️ Eco AI Waste Manager",
-    page_icon="♻️",
+    page_title="♻ Eco AI Waste Manager",
+    page_icon="♻",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -37,6 +161,14 @@ st.markdown("""
         border-left: 4px solid #FF9800;
         margin-top: 1rem;
     }
+    .message-box {
+        background-color: #19221C;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #4CAF50;
+        margin-top: 1rem;
+        font-size: 1.2rem;
+    }
     .stButton>button {
         width: 100%;
         background-color: #4CAF50;
@@ -52,11 +184,11 @@ st.markdown("""
 
 def main():
     # Header
-    st.markdown('<h1 class="main-header">♻️ Eco AI Waste Manager</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">♻ Eco AI Waste Manager</h1>', unsafe_allow_html=True)
     st.markdown("### Get instant recycling guidance for any waste material")
 
     # Create tabs for different functionalities
-    tab1, tab2 = st.tabs(["🧴 Get Recycling Guide", "📋 Quick Guide (Text)"])
+    tab1, tab2, tab3 = st.tabs(["🧴 Get Recycling Guide", "📋 Quick Guide (Text)", "💡 Waste Awareness"])
 
     with tab1:
         st.markdown("### 🧴 Get Detailed Recycling Instructions")
@@ -77,12 +209,12 @@ def main():
                 help="For location-specific recycling guidelines"
             )
 
-            if st.button("♻️ Get Recycling Guide", type="primary"):
+            if st.button("♻ Get Recycling Guide", type="primary"):
                 get_recycling_guide(waste_category, location)
 
         with col2:
             st.info("""
-            **💡 Tips:**
+            *💡 Tips:*
             - Select the waste material type from the dropdown
             - Add your location for region-specific guidance
             - Get detailed recycling instructions instantly
@@ -104,100 +236,45 @@ def main():
             else:
                 st.warning("Please enter a waste material type")
 
+    with tab3:
+        st.markdown("### 💡 Eco Awareness Tips & Fun Facts")
+        st.markdown("Get quick, engaging tips, fun facts, or quizzes about waste management!")
 
-def get_recycling_guide(waste_category, location):
-    """Call the recycling API and display results"""
-    try:
-        with st.spinner(f"🧠 Getting recycling guide for {waste_category}..."):
-            # Prepare the request data
-            payload = {"waste_category": waste_category}
-            if location:
-                payload["user_location"] = location
+        col1, col2 = st.columns([2, 1])
 
-            # Make API call
-            response = requests.post(
-                "http://localhost:8000/api/v1/recycling",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=30
-            )
+        with col1:
+            # Choose request type for awareness
+            request_type = st.radio("Choose request type:",
+                                    ("GET - Quick Tip", "POST - Detailed Tip"),
+                                    key="awareness_type")
 
-            if response.status_code == 200:
-                data = response.json()
-                display_results(data, waste_category)
-            else:
-                handle_error(response)
+            if st.button("💡 Get Awareness Message", key="awareness_btn"):
+                try:
+                    if request_type.startswith("POST"):
+                        response = requests.post(f"{BASE_URL}/awareness/")  # Correct endpoint
+                    else:
+                        response = requests.get(f"{BASE_URL}/awareness/quick")  # Correct endpoint
 
-    except requests.exceptions.ConnectionError:
-        st.error("""
-        **⚠️ Cannot connect to the server**
-        - Make sure the backend is running on port 8000
-        - Run this command: `python main.py` in your backend directory
-        """)
-    except requests.exceptions.Timeout:
-        st.error("⏱️ The request timed out. Please try again.")
-    except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.success("✅ Awareness Message Generated!")
+                        st.markdown(f'<div class="message-box">{data["message"]}</div>', unsafe_allow_html=True)
+                    else:
+                        st.error(f"❌ Error {response.status_code}: {response.text}")
 
+                except requests.exceptions.ConnectionError:
+                    st.error("⚠️ Cannot connect to the server. Make sure FastAPI backend is running on port 8000.")
+                except Exception as e:
+                    st.error(f"❌ Unexpected error: {str(e)}")
 
-def display_results(data, waste_category):
-    """Display the recycling guide results"""
-    st.success(f"**✅ Successfully generated recycling guide for {waste_category}**")
-
-    # Main results columns
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        st.markdown('<div class="success-box">', unsafe_allow_html=True)
-        st.markdown(f"**📦 Material Type:** {data.get('category', waste_category).title()}")
-        st.markdown("**📊 Status:** Analysis Complete")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # Quick actions
-        st.markdown("### 🚀 Quick Actions")
-        if st.button("📋 Copy to Clipboard", key="copy_btn"):
-            st.session_state.copied_text = data['guide']
-            st.success("Copied to clipboard!")
-
-        if st.button("🔄 Analyze Another Material", key="refresh_btn"):
-            st.rerun()
-
-    with col2:
-        st.markdown("### 📝 Recycling Guide")
-        st.markdown('<div class="guide-box">', unsafe_allow_html=True)
-        st.markdown(data['guide'])
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # Additional information
-    with st.expander("ℹ️ About This Guidance", expanded=False):
-        st.info("""
-        **How this works:**
-        - AI-powered recycling guidance based on waste type
-        - Provides preparation steps, disposal methods, and common mistakes
-        - Includes environmental impact information
-        - Location-specific advice when provided
-        """)
-
-
-def handle_error(response):
-    """Handle different error responses"""
-    try:
-        error_data = response.json()
-        error_detail = error_data.get('detail', {})
-
-        if isinstance(error_detail, dict):
-            st.error(f"""
-            **❌ Error: {error_detail.get('error_type', 'Unknown Error')}**
-            {error_detail.get('detail', 'No details provided')}
+        with col2:
+            st.info("""
+            *Tips:*
+            - Click the button to get a new awareness message
+            - Learn simple eco-friendly tips
+            - Discover fun facts about recycling
+            - Try short quizzes to test your knowledge
             """)
-        else:
-            st.error(f"**❌ Server Error:** {error_detail}")
-
-    except json.JSONDecodeError:
-        st.error(f"""
-        **❌ Server Error (HTTP {response.status_code})**
-        The server returned an invalid response. Please check if the backend is running properly.
-        """)
 
 
 if __name__ == "__main__":
@@ -211,7 +288,7 @@ if __name__ == "__main__":
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>♻️ <strong>Eco AI Waste Manager</strong> - Powered by FastAPI & Streamlit</p>
+        <p>♻ <strong>Eco AI Waste Manager</strong> - Powered by FastAPI & Streamlit</p>
         <p>🌍 Making recycling easier and more accessible</p>
     </div>
     """, unsafe_allow_html=True)
