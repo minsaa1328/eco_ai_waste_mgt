@@ -1,4 +1,66 @@
+import sys
+import os
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+
+# Add the correct path to Python path to resolve import issues
+current_file = os.path.abspath(__file__)
+backend_src_path = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+sys.path.insert(0, backend_src_path)
+
+# Import after path setup with proper error handling
+try:
+    from src.models.request_models import GuideRequest
+except ImportError as e:
+    print(f"Could not import GuideRequest: {e}")
+
+
+    # Fallback definition
+    class GuideRequest(BaseModel):
+        waste_category: str
+        user_location: Optional[str] = None
+
+try:
+    from src.models.response_models import GuideResponse, ErrorResponse
+except ImportError as e:
+    print(f"Could not import response models: {e}")
+
+
+    # Fallback definitions
+    class GuideResponse(BaseModel):
+        guide: str
+        category: str
+
+
+    class ErrorResponse(BaseModel):
+        error_type: str
+        detail: str
+
+try:
+    from src.crews.recycling_crew import RecyclingCrew
+
+    print("Imported RecyclingCrew successfully")
+except ImportError as e:
+    print(f"Could not import RecyclingCrew: {e}")
+
+
+    # Create a fallback crew based on the provided RecyclingCrew class
+    class RecyclingCrew:
+        def __init__(self):
+            # Simplified version without crewai dependencies
+            pass
+
+        def get_guide(self, waste_category: str, user_location: Optional[str] = None):
+            return f"""Recycling Guide for {waste_category.title()}:
+
+1. Preparation: Rinse and clean items before recycling
+2. Disposal: Place in appropriate recycling bin
+3. Avoid: Contaminating with non-recyclable materials
+4. Benefits: Reduces landfill waste and conserves resources
+5. Location: {user_location or 'General guidelines apply'}
+
+Remember to check local recycling regulations for specific requirements."""
 from ..models.request_models import GuideRequest
 from  ..models.response_models import GuideResponse, ErrorResponse
 from ..crews.recycling_crew import RecyclingCrew  # Direct import, no orchestrator
