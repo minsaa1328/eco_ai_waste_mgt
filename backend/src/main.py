@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from api.recycling import router as recycling_router  # Direct import
+from api.awareness import router as awareness_router
 from src.api.recycling import router as recycling_router
 from src.api.classifier import router as classifier_router
 import os
@@ -25,6 +27,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(recycling_router, prefix="/api/v1/recycling", tags=["Recycling"])
+app.include_router(awareness_router, prefix="/awareness", tags=["awareness"])
 app.include_router(classifier_router, prefix="/api/v1/classify", tags=["Classification"])
 
 
