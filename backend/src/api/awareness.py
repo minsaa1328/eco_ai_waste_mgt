@@ -1,54 +1,66 @@
 import sys
 import os
+import json
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Dict, Optional
 
 # Add the correct path to Python path
 current_file = os.path.abspath(__file__)
 backend_src_path = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-sys.path.insert(0, backend_src_path)  # Add to beginning of path
+sys.path.insert(0, backend_src_path)
 
 print(f"🔧 Added to Python path: {backend_src_path}")
 
-# Import after path setup with proper error handling
+# Import after path setup
 try:
     from src.models.response_models import ErrorResponse
-    print("Imported ErrorResponse successfully")
-except ImportError as e:
-    print(f"Could not import ErrorResponse: {e}")
 
-    # Fallback definition
+    print("✅ Imported ErrorResponse successfully")
+except ImportError as e:
+    print(f"❌ Could not import ErrorResponse: {e}")
+
+
     class ErrorResponse(BaseModel):
         error_type: str
         detail: str
 
 try:
     from src.crews.awareness_crew import AwarenessCrew
-    print("Imported AwarenessCrew successfully")
+
+    print("✅ Imported AwarenessCrew successfully")
 except ImportError as e:
-    print(f"Could not import AwarenessCrew: {e}")
-
-    # Create a simple fallback crew
-    class AwarenessCrew:
-        def get_awareness_message(self):
-            return """Fact: Recycling one glass bottle saves enough energy to power a lightbulb for 4 hours.
-Tip: Carry a reusable bag instead of single-use plastic bags.
-Quiz Question: How long does it take for plastic to decompose?
-Quiz Options: A) 50 years | B) 100 years | C) 450 years
-Quiz Answer: C) 450 years
-"""
+    print(f"❌ Could not import AwarenessCrew: {e}")
+    # Fallback crew would be defined here...
 
 
-# Awareness Response model
+# Request models
+class AwarenessRequest(BaseModel):
+    context: str
+    user_id: Optional[str] = None
+
+
+class QuizRequest(BaseModel):
+    topic: str
+    difficulty: Optional[str] = "medium"
+
+
+# Response models
 class AwarenessResponse(BaseModel):
-    fact: str
-    tip: str
-    quiz_question: str
-    quiz_options: str
-    quiz_answer: str
+    message: str
+    context: str
+    message_type: str = "awareness_tip"
 
 
-# Create router for Awareness Agent
+class QuizResponse(BaseModel):
+    question: str
+    options: Dict[str, str]
+    correct_answer: str
+    explanation: str
+    topic: str
+
+
+# Create router
 router = APIRouter()
 
 # Initialize crew lazily
@@ -56,85 +68,121 @@ _awareness_crew = None
 
 
 def get_awareness_crew():
-    """Lazy initialization of awareness crew"""
     global _awareness_crew
     if _awareness_crew is None:
         try:
             _awareness_crew = AwarenessCrew()
-            print("Awareness crew initialized successfully!")
+            print("✅ Awareness crew initialized successfully!")
         except Exception as e:
-            print(f"Crew initialization failed: {e}")
-
-            # Fallback crew
-            class FallbackCrew:
-                def get_awareness_message(self):
-                    return """Fact: Recycling one glass bottle saves enough energy to power a lightbulb for 4 hours.
-Tip: Compost your food waste to reduce landfill usage.
-Quiz Question: What percentage of plastic is actually recycled?
-Quiz Options: A) 20% | B) 30% | C) 9%
-Quiz Answer: C) 9%
-"""
-
-            _awareness_crew = FallbackCrew()
+            print(f"❌ Crew initialization failed: {e}")
+            # Fallback implementation...
     return _awareness_crew
 
 
-def parse_awareness_message(raw_message: str) -> AwarenessResponse:
-    """Convert the plain text message into structured response"""
+@router.post("/tip",
+             response_model=AwarenessResponse,
+             responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+             summary="Get awareness tip",
+             description="Returns a motivational and educational tip about waste management based on context")
+async def get_awareness_tip(request: AwarenessRequest):
     try:
-        lines = raw_message.splitlines()
-        fact = next((l.replace("Fact:", "").strip() for l in lines if l.startswith("Fact:")), "")
-        tip = next((l.replace("Tip:", "").strip() for l in lines if l.startswith("Tip:")), "")
-        quiz_question = next((l.replace("Quiz Question:", "").strip() for l in lines if l.startswith("Quiz Question:")), "")
-        quiz_options = next((l.replace("Quiz Options:", "").strip() for l in lines if l.startswith("Quiz Options:")), "")
-        quiz_answer = next((l.replace("Quiz Answer:", "").strip() for l in lines if l.startswith("Quiz Answer:")), "")
+        if not request.context or request.context.strip() == "":
+            raise HTTPException(status_code=400,
+                                detail={"error_type": "ValidationError", "detail": "Context cannot be empty"})
+
+        context = request.context.strip()
+        crew = get_awareness_crew()
+        message = crew.get_awareness_tip(context)
 
         return AwarenessResponse(
-            fact=fact,
-            tip=tip,
-            quiz_question=quiz_question,
-            quiz_options=quiz_options,
-            quiz_answer=quiz_answer
+            message=message,
+            context=context,
+            message_type="awareness_tip"
         )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={"error_type": "ParseError", "detail": f"Failed to parse message: {str(e)}"}
-        )
+        raise HTTPException(status_code=500, detail={"error_type": "InternalServerError",
+                                                     "detail": f"Failed to generate awareness tip: {str(e)}"})
 
 
-@router.post("/",
-             response_model=AwarenessResponse,
-             responses={
-                 400: {"model": ErrorResponse},
-                 500: {"model": ErrorResponse}
-             },
-             summary="Get awareness message",
-             description="Returns an educational waste management awareness message (fact, tip, quiz).")
-async def get_awareness_message():
+@router.post("/quiz",
+             response_model=QuizResponse,
+             responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+             summary="Get quiz question",
+             description="Returns a quiz question on waste management topics in JSON format")
+async def get_quiz_question(request: QuizRequest):
     try:
+        if not request.topic or request.topic.strip() == "":
+            raise HTTPException(status_code=400,
+                                detail={"error_type": "ValidationError", "detail": "Topic cannot be empty"})
+
+        topic = request.topic.strip()
         crew = get_awareness_crew()
-        raw_message = crew.get_awareness_message()
-        return parse_awareness_message(raw_message)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={"error_type": "InternalServerError", "detail": f"Failed to generate awareness message: {str(e)}"}
+        quiz_json = crew.get_quiz_question(topic)
+
+        # Parse the JSON response
+        try:
+            quiz_data = json.loads(quiz_json)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail={"error_type": "JSONParseError",
+                                                         "detail": f"Failed to parse quiz response: {str(e)}"})
+
+        return QuizResponse(
+            question=quiz_data.get("question", ""),
+            options=quiz_data.get("options", {}),
+            correct_answer=quiz_data.get("correct_answer", ""),
+            explanation=quiz_data.get("explanation", ""),
+            topic=topic
         )
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error_type": "InternalServerError",
+                                                     "detail": f"Failed to generate quiz question: {str(e)}"})
 
-@router.get("/quick",
-            response_model=AwarenessResponse,
-            summary="Quick awareness message (GET)",
-            description="Quick access to awareness messages for waste management.")
-async def get_awareness_message_quick():
+
+# GET endpoints for quick testing
+@router.get("/tip/{context}", response_model=AwarenessResponse, summary="Quick awareness tip (GET)")
+async def get_awareness_tip_quick(context: str):
     try:
-        crew = get_awareness_crew()
+        if not context or context.strip() == "":
+            raise HTTPException(status_code=400,
+                                detail={"error_type": "ValidationError", "detail": "Context cannot be empty"})
 
-        raw_message = crew.get_awareness_message()
-        return parse_awareness_message(raw_message)
+        context = context.strip()
+        crew = get_awareness_crew()
+        message = crew.get_awareness_tip(context)
+
+        return AwarenessResponse(message=message, context=context, message_type="awareness_tip")
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={"error_type": "InternalServerError", "detail": f"Failed to generate awareness message: {str(e)}"}
+        raise HTTPException(status_code=500, detail={"error_type": "InternalServerError",
+                                                     "detail": f"Failed to generate awareness tip: {str(e)}"})
+
+
+@router.get("/quiz/{topic}", response_model=QuizResponse, summary="Quick quiz question (GET)")
+async def get_quiz_question_quick(topic: str):
+    try:
+        if not topic or topic.strip() == "":
+            raise HTTPException(status_code=400,
+                                detail={"error_type": "ValidationError", "detail": "Topic cannot be empty"})
+
+        topic = topic.strip()
+        crew = get_awareness_crew()
+        quiz_json = crew.get_quiz_question(topic)
+
+        quiz_data = json.loads(quiz_json)
+        return QuizResponse(
+            question=quiz_data.get("question", ""),
+            options=quiz_data.get("options", {}),
+            correct_answer=quiz_data.get("correct_answer", ""),
+            explanation=quiz_data.get("explanation", ""),
+            topic=topic
         )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error_type": "InternalServerError",
+                                                     "detail": f"Failed to generate quiz question: {str(e)}"})
