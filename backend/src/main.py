@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-##from api.recycling import router as recycling_router  # Direct import
-from api.awareness import router as awareness_router
-from src.api.recycling import router as recycling_router
+from src.api.recycling import router as recycling_router  # Direct import
+from src.api.awareness import router as awareness_router
 from src.api.classifier import router as classifier_router
+from src.api.orchestrator import router as orchestrator_router  # ✅ NEW
 import os
 from dotenv import load_dotenv
 
@@ -26,10 +26,10 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(recycling_router, prefix="/api/v1/recycling", tags=["Recycling"])
-app.include_router(awareness_router, prefix="/api/awareness", tags=["awareness"])
-app.include_router(classifier_router, prefix="/api/v1/classify", tags=["Classification"])
-
+app.include_router(recycling_router, prefix="/api/recycling", tags=["Recycling"])
+app.include_router(awareness_router, prefix="/api/awareness", tags=["Awareness"])
+app.include_router(classifier_router, prefix="/api/classify", tags=["Classification"])
+app.include_router(orchestrator_router, prefix="/api/orchestrator", tags=["Orchestrator"])  # ✅ NEW
 
 @app.get("/")
 def read_root():
@@ -38,7 +38,7 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "recycling-guide"}
+    return {"status": "healthy", "service": "eco-ai-waste-manager"}
 
 
 if __name__ == "__main__":
