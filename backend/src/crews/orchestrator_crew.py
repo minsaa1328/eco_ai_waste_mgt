@@ -1,7 +1,7 @@
 from src.crews.awareness_crew import AwarenessCrew
 from src.crews.classifier_crew import ClassifierCrew
 from src.crews.recycling_crew import RecyclingCrew
-
+from src.crews.responsibleAICrew import ResponsibleAICrew
 
 class OrchestratorCrew:
     """
@@ -13,6 +13,7 @@ class OrchestratorCrew:
         self.awareness = AwarenessCrew()
         self.classifier = ClassifierCrew()
         self.recycling = RecyclingCrew()
+        self.responsible = ResponsibleAICrew()
 
     def handle_task(self, task: str, payload: dict, needs: list[str] = None):
         """
@@ -52,6 +53,10 @@ class OrchestratorCrew:
             if "quiz" in needs:
                 quiz = self.awareness.get_quiz_question(category)
                 results["steps"].append({"agent": "quiz", "output": quiz})
+
+            # Responsible AI check at the end
+            rai_result = self.responsible.check(payload, results["steps"])
+            results["steps"].append({"agent": "responsible_ai", "output": rai_result})
 
             return results
 
@@ -122,7 +127,13 @@ class OrchestratorCrew:
                     {"agent": "classifier", "output": classification},
                     {"agent": "recycling", "output": guide},
                     {"agent": "awareness", "output": tip},
-                    {"agent": "quiz", "output": quiz}
+                    {"agent": "quiz", "output": quiz},
+                    {"agent": "responsible_ai", "output": self.responsible.check(payload, [
+                        {"agent": "classifier", "output": classification},
+                        {"agent": "recycling", "output": guide},
+                        {"agent": "awareness", "output": tip},
+                        {"agent": "quiz", "output": quiz}
+                    ])}
                 ]
             }
 
