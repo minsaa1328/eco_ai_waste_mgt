@@ -1,11 +1,11 @@
 # backend/src/crews/classifier_crew.py
 import os
 import requests
-import json
+import base64
 from io import BytesIO
 from PIL import Image
-import base64
 from dotenv import load_dotenv
+from crewai import Agent, Task, Crew, Process
 
 # Load environment variables
 load_dotenv()
@@ -17,20 +17,45 @@ class ClassifierCrew:
         self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         self.categories = ["recyclable", "organic", "hazardous", "general"]
 
+        # Define the CrewAI agent
+        self.classifier_agent = Agent(
+            role="Waste Classification Expert",
+            goal="Classify waste items into recyclable, organic, hazardous, or general",
+            backstory="""You are an expert in waste management. You always respond with exactly one of:
+            recyclable, organic, hazardous, or general.""",
+            verbose=True
+        )
+
+        # Define the CrewAI task
+        self.classify_task = Task(
+            description="""Classify the following waste item into one of these categories:
+            recyclable, organic, hazardous, or general.
+
+            Item: {input}""",
+            agent=self.classifier_agent,
+            expected_output="One of: recyclable, organic, hazardous, general"
+        )
+
+        # Assemble Crew
+        self.crew = Crew(
+            agents=[self.classifier_agent],
+            tasks=[self.classify_task],
+            process=Process.sequential,
+            verbose=True
+        )
+
+    # ---------------- Gemini API Support ----------------
     def _encode_image(self, image_path: str) -> str:
-        """Helper function to encode a local image to base64 for the Gemini API."""
-        try:
-            with Image.open(image_path) as img:
-                if img.mode in ('RGBA', 'LA'):
-                    img = img.convert('RGB')
-                buffered = BytesIO()
-                img.save(buffered, format="JPEG")
-                return base64.b64encode(buffered.getvalue()).decode('utf-8')
-        except Exception as e:
-            raise Exception(f"Failed to process image: {str(e)}")
+        """Helper: encode image to base64 for Gemini API."""
+        with Image.open(image_path) as img:
+            if img.mode in ('RGBA', 'LA'):
+                img = img.convert('RGB')
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     def _call_gemini_api(self, prompt: str, image_data: str = None) -> str:
-        """Call Gemini 2.0 Flash API with proper headers and format."""
+        """Call Gemini 2.0 Flash API."""
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not set")
 
@@ -39,64 +64,24 @@ class ClassifierCrew:
             'X-goog-api-key': self.api_key
         }
 
-        content = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt}
-                    ]
-                }
-            ]
-        }
-
-        # Add image data if provided
+        content = {"contents": [{"parts": [{"text": prompt}]}]}
         if image_data:
             content["contents"][0]["parts"].append({
-                "inline_data": {
-                    "mime_type": "image/jpeg",
-                    "data": image_data
-                }
+                "inline_data": {"mime_type": "image/jpeg", "data": image_data}
             })
 
-        try:
-            response = requests.post(self.api_url, headers=headers, json=content)
-            response.raise_for_status()
+        response = requests.post(self.api_url, headers=headers, json=content)
+        response.raise_for_status()
+        result = response.json()
 
-            result = response.json()
-            if 'candidates' in result and result['candidates']:
-                return result['candidates'][0]['content']['parts'][0]['text'].strip()
-            else:
-                raise Exception("No valid response from Gemini API")
+        if 'candidates' in result and result['candidates']:
+            return result['candidates'][0]['content']['parts'][0]['text'].strip()
+        else:
+            raise Exception("No valid response from Gemini API")
 
-        except Exception as e:
-            print(f"Gemini API error: {e}")
-            raise
-
-    def _classify_with_gemini(self, input_data: str, is_image: bool = False) -> str:
-        """Classify using Gemini 2.0 Flash API"""
-        prompt = """You are a waste classification expert. Classify this item into exactly one category: 
-        recyclable, organic, hazardous, or general.
-
-        Respond with ONLY the single category name: 'recyclable', 'organic', 'hazardous', or 'general'.
-        Do not include any other text, explanations, or punctuation."""
-
-        try:
-            if is_image:
-                base64_image = self._encode_image(input_data)
-                response_text = self._call_gemini_api(prompt, base64_image)
-            else:
-                item_prompt = f"{prompt}\n\nItem: {input_data}"
-                response_text = self._call_gemini_api(item_prompt)
-
-            classification = response_text.strip().lower().replace('.', '')
-            return classification if classification in self.categories else "general"
-
-        except Exception as e:
-            print(f"Gemini classification error: {e}")
-            return self._basic_classification(input_data)
-
+    # ---------------- Fallback Classification ----------------
     def _basic_classification(self, text: str) -> str:
-        """Basic fallback classification using keyword matching"""
+        """Simple keyword fallback classification."""
         text_lower = text.lower()
 
         recyclable_keywords = ['plastic', 'glass', 'paper', 'metal', 'can', 'bottle', 'aluminum', 'cardboard', 'tin',
@@ -115,19 +100,34 @@ class ClassifierCrew:
         else:
             return "general"
 
+    # ---------------- Public Method ----------------
     def classify(self, input_data: str, is_image: bool = False) -> str:
         """
-        Classify the waste item using Gemini 2.0 Flash API with fallback.
+        Classify waste item using CrewAI + Gemini (with fallback).
+        Must return one of: recyclable, organic, hazardous, general
         """
         try:
+            # Prefer Gemini API if available
             if self.api_key:
-                return self._classify_with_gemini(input_data, is_image)
-            else:
-                # No API key, use basic classification
+                prompt = """You are a waste classification expert.
+                Classify the item into exactly one category:
+                recyclable, organic, hazardous, or general.
+                Respond with ONLY the single category name."""
+
                 if is_image:
-                    return "general"
+                    base64_image = self._encode_image(input_data)
+                    response_text = self._call_gemini_api(prompt, base64_image)
                 else:
-                    return self._basic_classification(input_data)
+                    response_text = self._call_gemini_api(f"{prompt}\n\nItem: {input_data}")
+
+                classification = response_text.strip().lower().replace('.', '')
+                return classification if classification in self.categories else "general"
+
+            # If no Gemini, fall back to CrewAI Agent
+            result = self.crew.kickoff(inputs={"input": input_data})
+            output = result.raw if hasattr(result, 'raw') else str(result)
+            output = output.strip().lower()
+            return output if output in self.categories else "general"
 
         except Exception as e:
             print(f"Classification error: {e}")
