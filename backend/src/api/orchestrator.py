@@ -2,7 +2,7 @@
 import sys, os
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 import tempfile
 from fastapi import Query
 
@@ -18,6 +18,12 @@ class OrchestratorRequest(BaseModel):
     task: str
     need: Optional[list[str]] = None
     payload: Optional[Dict] = None
+
+# Add this new model class before your routes
+class QuizAnswerRequest(BaseModel):
+    """Model for quiz answer submission"""
+    quiz_data: Dict[str, Any]  # The original quiz data
+    selected_answer: str       # The answer selected by user
 
 
 @router.post("/handle")
@@ -107,3 +113,44 @@ async def orchestrate_image(
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
+
+
+# Add this new endpoint after your existing routes
+@router.post("/quiz/answer")
+async def handle_quiz_answer(request: QuizAnswerRequest):
+    """
+    Handle quiz answer validation without re-running the quiz agent.
+    This prevents the orchestrator from generating a new quiz when checking answers.
+    """
+    try:
+        quiz_data = request.quiz_data
+        selected_answer = request.selected_answer
+
+        # Extract quiz components from the original quiz data
+        correct_answer = quiz_data.get('correct_answer', '')
+        explanation = quiz_data.get('explanation', '')
+        question = quiz_data.get('question', '')
+        options = quiz_data.get('options', {})
+
+        # Validate the answer (case-insensitive comparison)
+        is_correct = (selected_answer.strip().upper() == correct_answer.strip().upper())
+
+        # Return only validation result - NO AGENT EXECUTION
+        return {
+            "task": "quiz_answer_validation",
+            "steps": [
+                {
+                    "agent": "quiz_validator",
+                    "output": {
+                        "is_correct": is_correct,
+                        "selected_answer": selected_answer,
+                        "correct_answer": correct_answer,
+                        "explanation": explanation,
+                        "question": question
+                    }
+                }
+            ]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": str(e)})

@@ -1,3 +1,4 @@
+import litellm
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 # from src.api.recycling import router as recycling_router
@@ -9,6 +10,14 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+openai_key = os.getenv('OPENAI_API_KEY')
+if openai_key:
+    litellm.openai_key = openai_key
+    os.environ['OPENAI_API_KEY'] = openai_key
+    print("✅ OpenAI API key configured for LiteLLM")
+else:
+    print("❌ OPENAI_API_KEY not found in environment variables")
+
 
 app = FastAPI(
     title="Eco AI Waste Manager API",
