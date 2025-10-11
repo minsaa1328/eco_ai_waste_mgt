@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # from src.api.recycling import router as recycling_router
 # from src.api.awareness import router as awareness_router
 # from src.api.classifier import router as classifier_router
-from src.api.orchestrator import router as orchestrator_router
+from api.orchestrator import router as orchestrator_router
 import os
 from dotenv import load_dotenv
 
