@@ -1,5 +1,5 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboardIcon,
   ImageIcon,
@@ -8,17 +8,20 @@ import {
   BarChart3Icon,
   SettingsIcon,
   TrophyIcon,
-} from 'lucide-react';
+} from "lucide-react";
 
-export const Sidebar = ({ currentPage, setCurrentPage }) => {
+export const Sidebar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboardIcon size={20} /> },
-    { id: 'classifier', label: 'Classifier', icon: <ImageIcon size={20} /> },
-    { id: 'recycling-guide', label: 'Recycling Guide', icon: <RecycleIcon size={20} /> },
-    { id: 'awareness', label: 'Awareness', icon: <LeafIcon size={20} /> },
-    { id: 'rewards', label: 'Rewards', icon: <TrophyIcon size={20} /> },
-    { id: 'reports', label: 'Reports', icon: <BarChart3Icon size={20} /> },
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon size={20} /> },
+    { path: "/dashboard", label: "Dashboard", icon: <LayoutDashboardIcon size={20} /> },
+    { path: "/classifier", label: "Classifier", icon: <ImageIcon size={20} /> },
+    { path: "/recycling-guide", label: "Recycling Guide", icon: <RecycleIcon size={20} /> },
+    { path: "/awareness", label: "Awareness", icon: <LeafIcon size={20} /> },
+    { path: "/rewards", label: "Rewards", icon: <TrophyIcon size={20} /> },
+    { path: "/reports", label: "Reports", icon: <BarChart3Icon size={20} /> },
+    { path: "/settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
 
   return (
@@ -32,23 +35,26 @@ export const Sidebar = ({ currentPage, setCurrentPage }) => {
 
       <nav className="flex-1 pt-6">
         <ul>
-          {menuItems.map((item) => (
-            <li key={item.id}>
-              <button
-                onClick={() => setCurrentPage(item.id)}
-                className={`w-full flex items-center px-4 py-3 ${
-                  currentPage === item.id
-                    ? 'bg-green-700 border-l-4 border-white'
-                    : 'hover:bg-green-700'
-                }`}
-              >
-                <span className="flex items-center justify-center md:justify-start w-full md:w-auto">
-                  {item.icon}
-                  <span className="ml-4 hidden md:block">{item.label}</span>
-                </span>
-              </button>
-            </li>
-          ))}
+          {menuItems.map((item) => {
+            const active = location.pathname === item.path;
+            return (
+              <li key={item.path}>
+                <button
+                  onClick={() => navigate(item.path)}
+                  className={`w-full flex items-center px-4 py-3 ${
+                    active
+                      ? "bg-green-700 border-l-4 border-white"
+                      : "hover:bg-green-700"
+                  }`}
+                >
+                  <span className="flex items-center justify-center md:justify-start w-full md:w-auto">
+                    {item.icon}
+                    <span className="ml-4 hidden md:block">{item.label}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
@@ -62,9 +68,4 @@ export const Sidebar = ({ currentPage, setCurrentPage }) => {
       </div>
     </aside>
   );
-};
-
-Sidebar.propTypes = {
-  currentPage: PropTypes.string.isRequired,
-  setCurrentPage: PropTypes.func.isRequired,
 };

@@ -17,126 +17,74 @@ class OrchestratorCrew:
 
     def handle_task(self, task: str, payload: dict, needs: list[str] = None):
         """
-        Decide which agent(s) to call based on task or explicit 'needs'.
-        Supports:
-          - classify_text
-          - classify_image
-          - recycle
-          - awareness
-          - quiz
-          - end_to_end (chained workflow)
+        Unified orchestrator for all agents.
+        Supports both single-task ('classify', 'recycle', etc.)
+        and multi-agent 'custom' chains via 'needs'.
         """
-
         task = task.lower().strip()
 
-        # --- Needs override (manual selection of agents) ---
-        if needs:
-            results = {"task": task, "steps": []}
-
-            # Always run classifier first
+        # --- Handle direct single-agent tasks first ---
+        if task in ["classify", "classify_text", "classify_image"]:
             item = payload.get("item") or payload.get("image_path")
-            if not item:
-                return {"error_type": "ValidationError",
-                        "detail": "Missing 'item' or 'image_path' for classification"}
             category = self.classifier.classify(item, is_image=bool(payload.get("image_path")))
-            results["steps"].append({"agent": "classifier", "output": category})
+            return {"steps": [{"agent": "classifier", "output": category}]}
 
-            # Run other agents based on needs
-            if "guide" in needs or "recycle" in needs:
-                guide = self.recycling.get_guide(category, user_location=payload.get("location"))
-                results["steps"].append({"agent": "recycling", "output": guide})
+        if task == "recycle":
+            category = payload.get("category") or "general"
+            guide = self.recycling.get_guide(category, user_location=payload.get("location"))
+            return {"steps": [{"agent": "recycling", "output": guide}]}
 
-            if "awareness" in needs:
-                tip = self.awareness.get_awareness_tip(f"Item classified as {category}")
-                results["steps"].append({"agent": "awareness", "output": tip})
+        if task == "awareness":
+            context = payload.get("context") or "environmental sustainability"
+            tip = self.awareness.get_awareness_tip(context)
+            return {"steps": [{"agent": "awareness", "output": tip}]}
 
-            if "quiz" in needs:
-                quiz = self.awareness.get_quiz_question(category)
-                results["steps"].append({"agent": "quiz", "output": quiz})
+        # --- 🧠 Custom / Multi-Agent Chain ---
+        if task == "custom":
+            if not needs or len(needs) == 0:
+                return {"error_type": "ValidationError", "detail": "Missing 'needs' list for custom task."}
 
-            # Responsible AI check at the end
-            rai_result = self.responsible.check(payload, results["steps"])
-            results["steps"].append({"agent": "responsible_ai", "output": rai_result})
+            results = {"task": "custom", "steps": []}
+            category = None
+            context = payload.get("context")
 
+            for need in needs:
+                need = need.lower().strip()
+
+                # 🟢 1. Classification
+                if need in ["classify", "classifier"]:
+                    item = payload.get("item") or payload.get("image_path")
+                    if not item:
+                        return {"error_type": "ValidationError", "detail": "Missing 'item' for classification."}
+                    category = self.classifier.classify(item, is_image=bool(payload.get("image_path")))
+                    results["steps"].append({"agent": "classifier", "output": category})
+                    payload["category"] = category  # pass downstream
+
+                # 🔵 2. Recycling guide
+                elif need in ["recycle", "recycling", "guide"]:
+                    if not category:
+                        category = payload.get("category", "general")
+                    guide = self.recycling.get_guide(category, user_location=payload.get("location"))
+                    results["steps"].append({"agent": "recycling", "output": guide})
+                    payload["guide"] = guide
+
+                # 🟢 3. Awareness tip
+                elif need in ["awareness", "educate", "tip"]:
+                    if not context:
+                        context = f"Information about {category or 'waste management'}"
+                    tip = self.awareness.get_awareness_tip(context)
+                    results["steps"].append({"agent": "awareness", "output": tip})
+
+                # 🟣 4. Quiz generation
+                elif need in ["quiz"]:
+                    topic = category or payload.get("topic") or "recycling"
+                    quiz = self.awareness.get_quiz_question(topic)
+                    results["steps"].append({"agent": "quiz", "output": quiz})
+
+            # 🧩 Always finish with Responsible AI validation
+            rai = self.responsible.check(payload, results["steps"])
+            results["steps"].append({"agent": "responsible_ai", "output": rai})
             return results
 
-        # --- Classification ---
-        if task == "classify_text":
-            item = payload.get("item")
-            if not item:
-                return {"error_type": "ValidationError", "detail": "Missing 'item' for text classification"}
-            category = self.classifier.classify(item, is_image=False)
-            return {"task": "classify_text", "steps": [{"agent": "classifier", "output": category}]}
-
-        elif task == "classify_image":
-            image_path = payload.get("image_path")
-            if not image_path:
-                return {"error_type": "ValidationError", "detail": "Missing 'image_path' for image classification"}
-            category = self.classifier.classify(image_path, is_image=True)
-            return {"task": "classify_image", "steps": [{"agent": "classifier", "output": category}]}
-
-        # --- Recycling Guide ---
-        elif task == "recycle":
-            waste_category = payload.get("waste_category")
-            location = payload.get("location")
-            if not waste_category:
-                return {"error_type": "ValidationError", "detail": "Missing 'waste_category' for recycling guide"}
-            guide = self.recycling.get_guide(waste_category, user_location=location)
-            return {"task": "recycle", "steps": [{"agent": "recycling", "output": guide}]}
-
-        # --- Awareness ---
-        elif task == "awareness":
-            context = payload.get("context")
-            if not context:
-                return {"error_type": "ValidationError", "detail": "Missing 'context' for awareness tip"}
-            tip = self.awareness.get_awareness_tip(context)
-            return {"task": "awareness", "steps": [{"agent": "awareness", "output": tip}]}
-
-        # --- Quiz ---
-        elif task == "quiz":
-            topic = payload.get("topic")
-            if not topic:
-                return {"error_type": "ValidationError", "detail": "Missing 'topic' for quiz"}
-            quiz = self.awareness.get_quiz_question(topic)
-            return {"task": "quiz", "steps": [{"agent": "quiz", "output": quiz}]}
-
-        # --- End-to-End Workflow ---
-        elif task == "end_to_end":
-            is_image = payload.get("is_image", False)
-
-            if is_image:
-                image_path = payload.get("image_path")
-                if not image_path:
-                    return {"error_type": "ValidationError", "detail": "Missing 'image_path' for end-to-end image flow"}
-                classification = self.classifier.classify(image_path, is_image=True)
-                context_item = "uploaded image"
-            else:
-                item = payload.get("item")
-                if not item:
-                    return {"error_type": "ValidationError", "detail": "Missing 'item' for end-to-end text flow"}
-                classification = self.classifier.classify(item, is_image=False)
-                context_item = item
-
-            guide = self.recycling.get_guide(classification, user_location=payload.get("location"))
-            tip = self.awareness.get_awareness_tip(f"{context_item} classified as {classification}")
-            quiz = self.awareness.get_quiz_question(classification)
-
-            return {
-                "task": "end_to_end",
-                "steps": [
-                    {"agent": "classifier", "output": classification},
-                    {"agent": "recycling", "output": guide},
-                    {"agent": "awareness", "output": tip},
-                    {"agent": "quiz", "output": quiz},
-                    {"agent": "responsible_ai", "output": self.responsible.check(payload, [
-                        {"agent": "classifier", "output": classification},
-                        {"agent": "recycling", "output": guide},
-                        {"agent": "awareness", "output": tip},
-                        {"agent": "quiz", "output": quiz}
-                    ])}
-                ]
-            }
-
-        # --- Unknown Task ---
-        else:
-            return {"error_type": "UnknownTask", "detail": f"Unknown task: {task}"}
+        # 🚫 Unknown task
+        return {"error_type": "UnknownTask", "detail": f"Unknown task: {task}"}
