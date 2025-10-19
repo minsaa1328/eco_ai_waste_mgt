@@ -79,7 +79,7 @@ export const Classifier = () => {
     {
       name: 'Plastic Bottle',
       image:
-        'https://images.unsplash.com/photo-1625961332771-3f40b0e2bdcf?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1616118132534-381148898bb4?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=764',
       category: 'Plastic',
     },
     {
@@ -97,7 +97,7 @@ export const Classifier = () => {
     {
       name: 'Battery',
       image:
-        'https://images.unsplash.com/photo-1584383129963-f84e0c1ce8e3?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
+        'https://plus.unsplash.com/premium_photo-1683120793196-0797cec08a7d?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YmF0dGVyeXxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&q=60&w=600',
       category: 'E-Waste',
     },
   ];
