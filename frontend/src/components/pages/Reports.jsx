@@ -89,6 +89,55 @@ export const Reports = () => {
     value: 5
   }];
   const COLORS = ['#4ade80', '#60a5fa', '#fcd34d', '#f87171', '#a78bfa'];
+
+  // --- export helpers (added) ---
+  const topItems = [
+    { item: 'Plastic Water Bottle', category: 'Plastic', count: 156, recycled: '92%' },
+    { item: 'Cardboard Box', category: 'Paper', count: 124, recycled: '98%' },
+    { item: 'Food Scraps', category: 'Organic', count: 105, recycled: '75%' },
+    { item: 'Aluminum Can', category: 'Metal', count: 87, recycled: '95%' },
+    { item: 'Old Smartphone', category: 'E-Waste', count: 42, recycled: '100%' }
+  ];
+
+  const arrayToCSV = (arr) => {
+    if (!arr || !arr.length) return '';
+    const keys = Object.keys(arr[0]);
+    const header = keys.join(',');
+    const rows = arr.map(r => keys.map(k => {
+      const v = r[k] == null ? '' : String(r[k]);
+      return `"${v.replace(/"/g, '""')}"`;
+    }).join(','));
+    return [header, ...rows].join('\r\n');
+  };
+
+  const exportReport = () => {
+    const sections = [];
+    sections.push('"Monthly Classification by Category"');
+    sections.push(arrayToCSV(monthlyData));
+    sections.push('');
+    sections.push('"Environmental Impact Trends"');
+    sections.push(arrayToCSV(impactData));
+    sections.push('');
+    sections.push('"Waste Category Distribution"');
+    sections.push(arrayToCSV(categoryData.map(d => ({ name: d.name, value: d.value }))));
+    sections.push('');
+    sections.push('"Top Classified Items"');
+    sections.push(arrayToCSV(topItems.map(t => ({ Item: t.item, Category: t.category, Count: t.count, Recycled: t.recycled }))));
+
+    const csvContent = sections.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const now = new Date();
+    const filename = `ecoai_report_${now.toISOString().slice(0,10)}.csv`;
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">
@@ -105,7 +154,7 @@ export const Reports = () => {
               <span>Filter</span>
             </button>
           </div>
-          <button className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+          <button onClick={exportReport} className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
             <DownloadIcon size={16} className="mr-2" />
             <span>Export Report</span>
           </button>
