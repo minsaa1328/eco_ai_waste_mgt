@@ -1,20 +1,29 @@
-import React, { useState } from 'react';
-import { Card } from '../ui/Card.jsx';
-import { Badge } from '../ui/Badge.jsx';
+import React, { useState } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { Card } from "../ui/Card.jsx";
+import { Badge } from "../ui/Badge.jsx";
 import {
   UploadIcon,
   ImageIcon,
   TrashIcon,
   AlertCircleIcon,
   CheckCircleIcon,
-} from 'lucide-react';
+} from "lucide-react";
 
 export const Classifier = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
+  const navigate = useNavigate();
+
+  // ✅ Backend base URL from .env
+  const API_URL = import.meta.env.VITE_API_URL + "/api/orchestrator";
+
+  // 🧩 Handle file input / drag & drop
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -30,95 +39,120 @@ export const Classifier = () => {
     }
   };
 
-  const handleFile = (selectedFile) => {
+  // ✅ Upload file → send to backend
+  const handleFile = async (selectedFile) => {
     setFile(selectedFile);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result);
-    };
+    reader.onloadend = () => setPreview(reader.result);
     reader.readAsDataURL(selectedFile);
 
-    // Simulate classification
-    setTimeout(() => {
-      const categories = [
-        { category: 'Plastic', confidence: 96, color: 'blue' },
-        { category: 'Paper', confidence: 89, color: 'green' },
-        { category: 'Organic', confidence: 92, color: 'green' },
-        { category: 'Metal', confidence: 94, color: 'yellow' },
-        { category: 'E-Waste', confidence: 97, color: 'red' },
-      ];
-      setResult(categories[Math.floor(Math.random() * categories.length)]);
-    }, 1500);
-  };
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      const params = { needs: "classify" };
 
-  const handleTextSubmit = (e) => {
-    e.preventDefault();
-    if (textInput.trim()) {
-      // Simulate classification
-      setTimeout(() => {
-        const categories = [
-          { category: 'Plastic', confidence: 96, color: 'blue' },
-          { category: 'Paper', confidence: 89, color: 'green' },
-          { category: 'Organic', confidence: 92, color: 'green' },
-          { category: 'Metal', confidence: 94, color: 'yellow' },
-          { category: 'E-Waste', confidence: 97, color: 'red' },
-        ];
-        setResult(categories[Math.floor(Math.random() * categories.length)]);
-      }, 1000);
+      const res = await axios.post(`${API_URL}/handle/image`, formData, {
+        params,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const data = res.data;
+      const classifierStep = data.steps?.find(
+        (s) => s.agent.toLowerCase() === "classifier"
+      );
+
+      if (classifierStep) {
+        setResult({
+          item: selectedFile.name || "Uploaded Image",
+          category: classifierStep.output || "Unknown",
+          confidence: 95,
+          color: "green",
+        });
+      } else {
+        setResult({
+          item: selectedFile.name,
+          category: "Not Detected",
+          confidence: 0,
+          color: "gray",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend. Check server logs or CORS.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ✅ Handle text input classification
+  const handleTextSubmit = async (e) => {
+    e.preventDefault();
+    if (!textInput.trim()) return;
+
+    try {
+      setLoading(true);
+      const payload = {
+        task: "custom",
+        need: ["classify"],
+        payload: { item: textInput },
+      };
+
+      const res = await axios.post(`${API_URL}/handle`, payload);
+      const data = res.data;
+
+      const classifierStep = data.steps?.find(
+        (s) => s.agent.toLowerCase() === "classifier"
+      );
+
+      if (classifierStep) {
+        setResult({
+          item: textInput,
+          category: classifierStep.output || "Unknown",
+          confidence: 95,
+          color: "green",
+        });
+      } else {
+        setResult({ category: "Not Detected", confidence: 0, color: "gray" });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Clear all states
   const clearAll = () => {
     setFile(null);
     setPreview(null);
-    setTextInput('');
+    setTextInput("");
     setResult(null);
   };
 
-  const sampleWasteItems = [
-    {
-      name: 'Plastic Bottle',
-      image:
-        'https://images.unsplash.com/photo-1625961332771-3f40b0e2bdcf?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
-      category: 'Plastic',
-    },
-    {
-      name: 'Newspaper',
-      image:
-        'https://images.unsplash.com/photo-1566378246598-5b11a0d486cc?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
-      category: 'Paper',
-    },
-    {
-      name: 'Banana Peel',
-      image:
-        'https://images.unsplash.com/photo-1528825871115-3581a5387919?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
-      category: 'Organic',
-    },
-    {
-      name: 'Battery',
-      image:
-        'https://images.unsplash.com/photo-1584383129963-f84e0c1ce8e3?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
-      category: 'E-Waste',
-    },
-  ];
+  // 🧠 Navigate to Awareness page with data
+  const goToAwareness = () => {
+    if (!result) return;
+    navigate("/awareness", {
+      state: {
+        item: result.item,
+        category: result.category,
+        from: "classifier",
+      },
+    });
+  };
 
-  const handleSampleClick = (item) => {
-    setPreview(item.image);
-    // Simulate classification
-    setTimeout(() => {
-      setResult({
-        category: item.category,
-        confidence: 90 + Math.floor(Math.random() * 10),
-        color:
-          item.category === 'Plastic'
-            ? 'blue'
-            : item.category === 'Paper'
-            ? 'green'
-            : item.category === 'Organic'
-            ? 'green'
-            : 'red',
-      });
-    }, 1000);
+  // ♻️ Navigate to Recycling Guide with data
+  const goToRecyclingGuide = () => {
+    if (!result) return;
+    navigate("/recycling-guide", {
+      state: {
+        item: result.item,
+        category: result.category,
+        from: "classifier",
+      },
+    });
   };
 
   return (
@@ -126,45 +160,6 @@ export const Classifier = () => {
       <h1 className="text-2xl font-bold text-gray-800">
         Waste Category Classifier
       </h1>
-
-      {/* Sample Waste Items */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="text-lg font-medium text-gray-800 mb-4">
-          Common Waste Items
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {sampleWasteItems.map((item, index) => (
-            <div
-              key={index}
-              className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => handleSampleClick(item)}
-            >
-              <div className="h-24 w-24 rounded-lg overflow-hidden mb-2">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <p className="text-sm font-medium text-gray-700">{item.name}</p>
-              <Badge
-                color={
-                  item.category === 'Plastic'
-                    ? 'blue'
-                    : item.category === 'Paper'
-                    ? 'green'
-                    : item.category === 'Organic'
-                    ? 'green'
-                    : 'red'
-                }
-                className="mt-1"
-              >
-                {item.category}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Section */}
@@ -214,7 +209,7 @@ export const Classifier = () => {
                     </button>
                   </div>
                   <p className="text-sm text-gray-600">
-                    {file?.name || 'Sample Image'}
+                    {file?.name || "Selected Image"}
                   </p>
                 </div>
               )}
@@ -233,10 +228,10 @@ export const Classifier = () => {
                 ></textarea>
                 <button
                   type="submit"
-                  disabled={!textInput.trim()}
+                  disabled={!textInput.trim() || loading}
                   className="w-full py-2 bg-green-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
                 >
-                  Classify
+                  {loading ? "Classifying..." : "Classify"}
                 </button>
               </div>
             </form>
@@ -262,9 +257,9 @@ export const Classifier = () => {
                     <div className="flex items-center mt-1">
                       <h3 className="text-2xl font-bold">{result.category}</h3>
                       <Badge color={result.color} className="ml-3">
-                        {result.category === 'E-Waste'
-                          ? 'Special Handling'
-                          : 'Common'}
+                        {result.category === "E-Waste"
+                          ? "Special Handling"
+                          : "Common"}
                       </Badge>
                     </div>
                   </div>
@@ -273,6 +268,7 @@ export const Classifier = () => {
                   </div>
                 </div>
 
+                {/* Confidence Bar */}
                 <div>
                   <p className="text-sm font-medium text-gray-600">
                     Confidence Score
@@ -292,7 +288,11 @@ export const Classifier = () => {
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                {/* Did You Know Tip */}
+                <div
+                  className="p-4 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={goToAwareness}
+                >
                   <div className="flex">
                     <AlertCircleIcon size={20} className="text-blue-500" />
                     <div className="ml-3">
@@ -300,25 +300,16 @@ export const Classifier = () => {
                         Did you know?
                       </p>
                       <p className="text-sm text-blue-600">
-                        {result.category === 'Plastic' &&
-                          'Plastic takes up to 1,000 years to decompose in landfills.'}
-                        {result.category === 'Paper' &&
-                          'Recycling one ton of paper saves 17 trees and 7,000 gallons of water.'}
-                        {result.category === 'Organic' &&
-                          'Composting organic waste reduces methane emissions from landfills.'}
-                        {result.category === 'Metal' &&
-                          'Aluminum cans can be recycled infinitely without quality degradation.'}
-                        {result.category === 'E-Waste' &&
-                          'E-waste contains valuable materials like gold, silver, and copper that can be recovered.'}
+                        Click here to learn more about{" "}
+                        <strong>{result.category}</strong> waste and its impact.
                       </p>
                     </div>
                   </div>
                 </div>
 
+                {/* Go to Recycling Guide */}
                 <button
-                  onClick={() =>
-                    (window.location.href = '#recycling-guide')
-                  }
+                  onClick={goToRecyclingGuide}
                   className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   View Recycling Guide
