@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # from src.api.recycling import router as recycling_router
 # from src.api.awareness import router as awareness_router
 # from src.api.classifier import router as classifier_router
-from src.api.orchestrator import router as orchestrator_router
+from api.orchestrator import router as orchestrator_router
 import os
 from dotenv import load_dotenv
 
@@ -28,7 +28,12 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173","http://localhost:5174", "http://127.0.0.1:5174"],
+        allow_origins=[
+        "http://localhost:8501",
+        "http://127.0.0.1:8501",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RecycleIcon, MenuIcon, XIcon } from 'lucide-react';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, useAuth } from '@clerk/clerk-react';
 export const Header = ({
   setCurrentPage
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isSignedIn } = useAuth();
+  const prevSignedInRef = useRef(isSignedIn);
+
+  useEffect(() => {
+    // Navigate to dashboard when the user signs in (transition from false -> true)
+    if (!prevSignedInRef.current && isSignedIn) {
+      setCurrentPage('dashboard');
+    }
+    prevSignedInRef.current = isSignedIn;
+  }, [isSignedIn, setCurrentPage]);
   return <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
@@ -32,14 +43,25 @@ export const Header = ({
               Contact Us
             </a>
           </nav>
-          {/* CTA Buttons */}
+          {/* CTA Buttons (Clerk-powered) */}
           <div className="hidden md:flex items-center space-x-4">
-            <button onClick={() => setCurrentPage('dashboard')} className="px-4 py-2 text-green-600 font-medium hover:text-green-700 transition-colors">
-              Login
-            </button>
-            <button onClick={() => setCurrentPage('dashboard')} className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
-              Register
-            </button>
+            <SignedOut>
+              <SignInButton>
+                <button className="px-4 py-2 text-green-600 font-medium hover:text-green-700 transition-colors">
+                  Login
+                </button>
+              </SignInButton>
+              <SignUpButton>
+                <button className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors ml-2">
+                  Register
+                </button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <button onClick={() => setCurrentPage('dashboard')} className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+                Go to Dashboard
+              </button>
+            </SignedIn>
           </div>
           {/* Mobile Menu Button */}
           <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -66,12 +88,23 @@ export const Header = ({
               Contact Us
             </a>
             <div className="pt-4 flex flex-col space-y-3">
-              <button onClick={() => setCurrentPage('dashboard')} className="w-full px-4 py-2 text-green-600 font-medium border border-green-600 rounded-lg">
-                Login
-              </button>
-              <button onClick={() => setCurrentPage('dashboard')} className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg">
-                Register
-              </button>
+              <SignedOut>
+                <SignInButton>
+                  <button className="w-full px-4 py-2 text-green-600 font-medium border border-green-600 rounded-lg">
+                    Login
+                  </button>
+                </SignInButton>
+                <SignUpButton>
+                  <button className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg">
+                    Register
+                  </button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <button onClick={() => setCurrentPage('dashboard')} className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg">
+                  Go to Dashboard
+                </button>
+              </SignedIn>
             </div>
           </div>
         </div>}
