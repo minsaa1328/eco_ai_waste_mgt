@@ -1,8 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card.jsx';
-import { BellIcon, GlobeIcon, UserIcon, KeyIcon, ShieldIcon, MonitorIcon, SaveIcon } from 'lucide-react';
+import { BellIcon, GlobeIcon, UserIcon, ShieldIcon, SaveIcon } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
 export const Settings = () => {
   const [activeTab, setActiveTab] = useState('profile');
+  const { user, isLoaded } = useUser();
+
+  // Local controlled state for the profile form so we can prefill with the signed-in user's info
+  const [profile, setProfile] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    bio: ''
+  });
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    setProfile({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      // Clerk exposes primaryEmailAddress on the user object in many setups
+      email: user.primaryEmailAddress?.emailAddress || (user.emailAddresses?.[0]?.emailAddress) || '',
+      // Keep bio in publicMetadata if present
+      bio: (user.publicMetadata && user.publicMetadata.bio) || ''
+    });
+  }, [isLoaded, user]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setProfile(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    // Try to update the Clerk user if supported. If not available, just log the values.
+    try {
+      if (user && typeof user.update === 'function') {
+        await user.update({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          publicMetadata: { ...(user.publicMetadata || {}), bio: profile.bio }
+        });
+        // Optionally show a toast or confirmation here — omitted to keep this minimal
+        return;
+      }
+      console.log('Save profile (no user.update available):', profile);
+    } catch (err) {
+      console.error('Failed to update user profile', err);
+    }
+  };
   const tabs = [{
     id: 'profile',
     label: 'Profile',
@@ -46,20 +91,21 @@ export const Settings = () => {
                         <label className="block text-sm font-medium text-gray-700">
                           First Name
                         </label>
-                        <input type="text" defaultValue="Alex" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                        <input name="firstName" type="text" value={profile.firstName} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
                           Last Name
                         </label>
-                        <input type="text" defaultValue="Johnson" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                        <input name="lastName" type="text" value={profile.lastName} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Email
                       </label>
-                      <input type="email" defaultValue="alex.johnson@example.com" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                      {/* Email updates generally require a verification flow; show as read-only here */}
+                      <input name="email" type="email" value={profile.email} readOnly className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 cursor-not-allowed" />
                     </div>
                   </div>
                 </div>
@@ -67,10 +113,10 @@ export const Settings = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     Bio
                   </label>
-                  <textarea rows={4} defaultValue="Eco enthusiast passionate about waste reduction and sustainable living. Working to make a positive environmental impact one day at a time." className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"></textarea>
+                  <textarea name="bio" rows={4} value={profile.bio} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"></textarea>
                 </div>
                 <div className="flex justify-end">
-                  <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                  <button onClick={handleSaveProfile} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                     <SaveIcon size={18} className="mr-2" />
                     Save Changes
                   </button>

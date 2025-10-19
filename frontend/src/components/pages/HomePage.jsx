@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { Header } from '../layout/Header';
+import { SignedIn, SignedOut, SignInButton } from '@clerk/clerk-react';
 import { Footer } from '../layout/Footer';
 import { ImageIcon, RecycleIcon, LeafIcon, ArrowRightIcon, CheckCircleIcon, UsersIcon, BuildingIcon, GlobeIcon } from 'lucide-react';
 export const HomePage = ({
@@ -27,9 +28,18 @@ export const HomePage = ({
               <button onClick={() => setCurrentPage('classifier')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
                 Try Classifier
               </button>
-              <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center">
-                Get Started <ArrowRightIcon size={18} className="ml-2" />
-              </button>
+              <SignedIn>
+                <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                  Get Started <ArrowRightIcon size={18} className="ml-2" />
+                </button>
+              </SignedIn>
+              <SignedOut>
+                <SignInButton>
+                  <button className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                    Get Started <ArrowRightIcon size={18} className="ml-2" />
+                  </button>
+                </SignInButton>
+              </SignedOut>
             </div>
           </div>
         </div>
@@ -172,9 +182,18 @@ export const HomePage = ({
             </div>
           </div>
           <div className="mt-16 text-center">
-            <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
-              Try It Yourself
-            </button>
+            <SignedIn>
+              <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+                Try It Yourself
+              </button>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton>
+                <button className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+                  Try It Yourself
+                </button>
+              </SignInButton>
+            </SignedOut>
           </div>
         </div>
       </section>
@@ -363,9 +382,18 @@ export const HomePage = ({
             improve waste management education.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
-              Get Started for Free
-            </button>
+            <SignedIn>
+              <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
+                Get Started for Free
+              </button>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton>
+                <button className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
+                  Get Started for Free
+                </button>
+              </SignInButton>
+            </SignedOut>
             <button className="px-6 py-3 border-2 border-white text-white font-medium rounded-lg hover:bg-white/10 transition-colors">
               Schedule a Demo
             </button>
