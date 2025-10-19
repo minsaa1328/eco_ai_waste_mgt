@@ -1,13 +1,15 @@
-import React, { memo } from 'react';
+import React from 'react';
 import { Header } from '../layout/Header';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/clerk-react';
 import { Footer } from '../layout/Footer';
-import { ImageIcon, RecycleIcon, LeafIcon, ArrowRightIcon, CheckCircleIcon, UsersIcon, BuildingIcon, GlobeIcon } from 'lucide-react';
-export const HomePage = ({
-  setCurrentPage
-}) => {
+import { ImageIcon, RecycleIcon, LeafIcon, ArrowRightIcon, UsersIcon, BuildingIcon, GlobeIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+export const HomePage = () => {
+  const navigate = useNavigate();
+
   return <div className="min-h-screen flex flex-col bg-white">
-      <Header setCurrentPage={setCurrentPage} />
+      <Header />
       {/* Hero Section */}
       <section className="relative">
         <div className="absolute inset-0 z-0">
@@ -25,11 +27,11 @@ export const HomePage = ({
               impact on our planet.
             </p>
             <div className="flex flex-wrap gap-4">
-              <button onClick={() => setCurrentPage('classifier')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => navigate('/classifier')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
                 Try Classifier
               </button>
               <SignedIn>
-                <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                <button onClick={() => navigate('/dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center">
                   Get Started <ArrowRightIcon size={18} className="ml-2" />
                 </button>
               </SignedIn>
@@ -73,7 +75,7 @@ export const HomePage = ({
                   Upload images of waste items and our AI will instantly
                   classify them into the correct recycling category.
                 </p>
-                <button onClick={() => setCurrentPage('classifier')} className="text-green-600 font-medium flex items-center hover:text-green-700">
+                <button onClick={() => navigate('/classifier')} className="text-green-600 font-medium flex items-center hover:text-green-700">
                   Try It Now <ArrowRightIcon size={16} className="ml-2" />
                 </button>
               </div>
@@ -93,7 +95,7 @@ export const HomePage = ({
                   Get step-by-step instructions on how to properly recycle
                   different types of materials and items.
                 </p>
-                <button onClick={() => setCurrentPage('recycling-guide')} className="text-blue-600 font-medium flex items-center hover:text-blue-700">
+                <button onClick={() => navigate('/recycling-guide')} className="text-blue-600 font-medium flex items-center hover:text-blue-700">
                   View Guides <ArrowRightIcon size={16} className="ml-2" />
                 </button>
               </div>
@@ -113,7 +115,7 @@ export const HomePage = ({
                   Learn eco-friendly tips, facts about waste management, and how
                   small changes can make a big difference.
                 </p>
-                <button onClick={() => setCurrentPage('awareness')} className="text-yellow-600 font-medium flex items-center hover:text-yellow-700">
+                <button onClick={() => navigate('/awareness')} className="text-yellow-600 font-medium flex items-center hover:text-yellow-700">
                   Explore Tips <ArrowRightIcon size={16} className="ml-2" />
                 </button>
               </div>
@@ -183,7 +185,7 @@ export const HomePage = ({
           </div>
           <div className="mt-16 text-center">
             <SignedIn>
-              <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+              <button onClick={() => navigate('/dashboard')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
                 Try It Yourself
               </button>
             </SignedIn>
@@ -265,7 +267,7 @@ export const HomePage = ({
               <button className="w-2 h-2 rounded-full bg-green-300"></button>
             </div>
             <div className="mt-12 text-center">
-              <button onClick={() => setCurrentPage('awareness')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+              <button onClick={() => navigate('/awareness')} className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
                 Explore More Eco Tips
               </button>
             </div>
@@ -383,7 +385,7 @@ export const HomePage = ({
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <SignedIn>
-              <button onClick={() => setCurrentPage('dashboard')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => navigate('/dashboard')} className="px-6 py-3 bg-white text-green-700 font-medium rounded-lg hover:bg-gray-100 transition-colors">
                 Get Started for Free
               </button>
             </SignedIn>
@@ -399,7 +401,12 @@ export const HomePage = ({
             </button>
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="mt-16">
+          <Footer />
+        </div>
       </section>
-      <Footer />
     </div>;
 };
+
