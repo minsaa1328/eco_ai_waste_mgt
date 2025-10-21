@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { Card } from "../ui/Card.jsx";
 import { Badge } from "../ui/Badge.jsx";
 import {
@@ -17,29 +18,26 @@ export const Classifier = () => {
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
+  const { getToken } = useAuth();
 
-  // ✅ Backend base URL from .env
+  // ✅ Backend base URL
   const API_URL = import.meta.env.VITE_API_URL + "/api/orchestrator";
 
-  // 🧩 Handle file input / drag & drop
+  // ---------------- FILE UPLOAD ----------------
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const selectedFile = e.dataTransfer.files[0];
-      handleFile(selectedFile);
+      handleFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileInput = (e) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      handleFile(selectedFile);
+      handleFile(e.target.files[0]);
     }
   };
 
-  // ✅ Upload file → send to backend
   const handleFile = async (selectedFile) => {
     setFile(selectedFile);
     const reader = new FileReader();
@@ -48,13 +46,17 @@ export const Classifier = () => {
 
     try {
       setLoading(true);
+      const token = await getToken();
       const formData = new FormData();
       formData.append("file", selectedFile);
-      const params = { needs: "classify" };
+      const params = { needs: "guide,awareness,quiz" };
 
       const res = await axios.post(`${API_URL}/handle/image`, formData, {
         params,
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       const data = res.data;
@@ -78,29 +80,37 @@ export const Classifier = () => {
         });
       }
     } catch (err) {
-      console.error(err);
-      alert("Failed to connect to backend. Check server logs or CORS.");
+      console.error("❌ Image classification failed:", err.response?.data || err);
+      alert("Failed to connect to backend. Check logs or CORS setup.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Handle text input classification
+  // ---------------- TEXT CLASSIFICATION ----------------
   const handleTextSubmit = async (e) => {
     e.preventDefault();
     if (!textInput.trim()) return;
 
     try {
       setLoading(true);
+      const token = await getToken();
+      console.log("🔑 Clerk token:", token);
+
       const payload = {
-        task: "custom",
-        need: ["classify"],
+        task: "custom", // ✅ backend supports custom multi-agent chain
+        need: ["classify", "awareness", "quiz"],
         payload: { item: textInput },
       };
 
-      const res = await axios.post(`${API_URL}/handle`, payload);
-      const data = res.data;
+      const res = await axios.post(`${API_URL}/handle`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
+      const data = res.data;
       const classifierStep = data.steps?.find(
         (s) => s.agent.toLowerCase() === "classifier"
       );
@@ -116,14 +126,14 @@ export const Classifier = () => {
         setResult({ category: "Not Detected", confidence: 0, color: "gray" });
       }
     } catch (err) {
-      console.error(err);
-      alert("Failed to connect to backend.");
+      console.error("❌ Text classification failed:", err.response?.data || err);
+      alert("Failed to connect to backend. Check payload or token.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Clear all states
+  // ---------------- UTILITIES ----------------
   const clearAll = () => {
     setFile(null);
     setPreview(null);
@@ -131,7 +141,6 @@ export const Classifier = () => {
     setResult(null);
   };
 
-  // 🧠 Navigate to Awareness page with data
   const goToAwareness = () => {
     if (!result) return;
     navigate("/awareness", {
@@ -143,7 +152,6 @@ export const Classifier = () => {
     });
   };
 
-  // ♻️ Navigate to Recycling Guide with data
   const goToRecyclingGuide = () => {
     if (!result) return;
     navigate("/recycling-guide", {
@@ -155,6 +163,7 @@ export const Classifier = () => {
     });
   };
 
+  // ---------------- UI ----------------
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">
@@ -162,7 +171,7 @@ export const Classifier = () => {
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upload Section */}
+        {/* -------- Left: Input Section -------- */}
         <div className="space-y-6">
           <Card title="Upload Image">
             <div
@@ -222,7 +231,7 @@ export const Classifier = () => {
                 <textarea
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Describe the item you want to classify (e.g., 'plastic water bottle with blue cap')"
+                  placeholder="Describe the item (e.g., 'plastic water bottle with blue cap')"
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   rows={4}
                 ></textarea>
@@ -238,7 +247,7 @@ export const Classifier = () => {
           </Card>
         </div>
 
-        {/* Classification Result */}
+        {/* -------- Right: Result Section -------- */}
         <div>
           <Card title="Classification Result" className="h-full">
             {!result ? (
@@ -246,7 +255,7 @@ export const Classifier = () => {
                 <ImageIcon size={48} className="text-gray-300 mb-4" />
                 <p className="text-gray-500">
                   Upload an image or describe an item to see the classification
-                  result
+                  result.
                 </p>
               </div>
             ) : (
@@ -274,11 +283,9 @@ export const Classifier = () => {
                     Confidence Score
                   </p>
                   <div className="mt-2 relative pt-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-green-600">
-                        {result.confidence}%
-                      </span>
-                    </div>
+                    <span className="text-xs font-semibold text-green-600">
+                      {result.confidence}%
+                    </span>
                     <div className="overflow-hidden h-2 mb-4 rounded bg-gray-200">
                       <div
                         style={{ width: `${result.confidence}%` }}
@@ -288,7 +295,7 @@ export const Classifier = () => {
                   </div>
                 </div>
 
-                {/* Did You Know Tip */}
+                {/* Awareness Tip */}
                 <div
                   className="p-4 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
                   onClick={goToAwareness}
@@ -300,14 +307,14 @@ export const Classifier = () => {
                         Did you know?
                       </p>
                       <p className="text-sm text-blue-600">
-                        Click here to learn more about{" "}
+                        Click to learn more about{" "}
                         <strong>{result.category}</strong> waste and its impact.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Go to Recycling Guide */}
+                {/* Recycling Guide */}
                 <button
                   onClick={goToRecyclingGuide}
                   className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
