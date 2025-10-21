@@ -19,6 +19,7 @@ import {
   TrashIcon,
   TrophyIcon,
 } from "lucide-react";
+import { useAuth } from '@clerk/clerk-react';
 
 export const RecyclingGuide = () => {
   const location = useLocation();
@@ -38,6 +39,7 @@ export const RecyclingGuide = () => {
   const [currentFact, setCurrentFact] = useState(0);
   const [dynamicGuide, setDynamicGuide] = useState(null);
   const [loadingGuide, setLoadingGuide] = useState(false);
+  const { getToken } = useAuth();
 
   const API_URL = import.meta.env.VITE_API_URL + "/api/orchestrator";
 
@@ -73,6 +75,7 @@ export const RecyclingGuide = () => {
   const fetchInitialGuide = async () => {
     try {
       setLoadingGuide(true);
+      const token = await getToken();
       const payload = {
         task: "custom",
         need: ["recycle", "awareness"],
@@ -83,7 +86,12 @@ export const RecyclingGuide = () => {
         },
       };
 
-      const res = await axios.post(`${API_URL}/handle`, payload);
+      const res = await axios.post(`${API_URL}/handle`, payload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       const steps = res.data.steps || [];
 
       const recyclingStep = steps.find((s) => s.agent.toLowerCase() === "recycling");
@@ -124,12 +132,18 @@ export const RecyclingGuide = () => {
     setIsTyping(true);
 
     try {
+      const token = await getToken();
       const payload = {
         task: "custom",
         need: ["recycle", "awareness"],
         payload: { item: inputMessage, category: selectedCategory },
       };
-      const res = await axios.post(`${API_URL}/handle`, payload);
+      const res = await axios.post(`${API_URL}/handle`, payload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       const steps = res.data.steps || [];
       const recyclingStep = steps.find((s) => s.agent === "recycling");
       const awarenessStep = steps.find((s) => s.agent === "awareness");
@@ -145,7 +159,7 @@ export const RecyclingGuide = () => {
         ...prev,
         {
           sender: "ai",
-          text: aiResponseText || "I couldn’t find an exact answer. Try rephrasing!",
+          text: aiResponseText || "I couldn't find an exact answer. Try rephrasing!",
           timestamp: new Date(),
         },
       ]);
@@ -157,7 +171,7 @@ export const RecyclingGuide = () => {
         ...prev,
         {
           sender: "ai",
-          text: "⚠️ Sorry, I couldn’t reach the backend. Please check your server.",
+          text: "⚠️ Sorry, I couldn't reach the backend. Please check your server.",
           timestamp: new Date(),
         },
       ]);
@@ -180,7 +194,7 @@ export const RecyclingGuide = () => {
   const currentGuide = {
     title: `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Recycling Guide`,
     description: dynamicGuide
-      ? "Here’s an AI-generated guide and awareness insight based on your item."
+      ? "Here's an AI-generated guide and awareness insight based on your item."
       : `Learn how to recycle ${selectedCategory} items responsibly.`,
   };
 

@@ -1,11 +1,13 @@
-# backend/src/api/orchestrator.py
-import sys, os
-from fastapi import APIRouter, HTTPException, UploadFile, File
+import os, tempfile
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends
 from pydantic import BaseModel
 from typing import Dict, Optional, Any
-import tempfile
-from fastapi import Query
 
+# ✅ Clerk + MongoDB integration
+from src.utils.auth import verify_clerk_token
+from src.db import users_collection
+
+# ✅ Agent orchestrator
 from src.crews.orchestrator_crew import OrchestratorCrew
 
 # Initialize router and orchestrator
@@ -13,29 +15,27 @@ router = APIRouter()
 orchestrator = OrchestratorCrew()
 
 
+# -------------------- MODELS --------------------
 class OrchestratorRequest(BaseModel):
     """Generic orchestrator request model for JSON-based tasks"""
     task: str
     need: Optional[list[str]] = None
     payload: Optional[Dict] = None
 
-# Add this new model class before your routes
+
 class QuizAnswerRequest(BaseModel):
     """Model for quiz answer submission"""
-    quiz_data: Dict[str, Any]  # The original quiz data
-    selected_answer: str       # The answer selected by user
+    quiz_data: Dict[str, Any]
+    selected_answer: str
 
 
+# -------------------- TEXT / CUSTOM TASK HANDLER --------------------
 @router.post("/handle")
-async def orchestrate(request: OrchestratorRequest):
+async def orchestrate(request: OrchestratorRequest, user=Depends(verify_clerk_token)):
+    print("📩 Received body:", request)
     """
-    Main orchestrator endpoint.
-    Handles all JSON-based tasks:
-      - classify_text
-      - recycle
-      - awareness
-      - quiz
-      - end_to_end
+    Handles all text-based or custom orchestrations.
+    Supports classify_text, recycle, awareness, quiz, and custom chains.
     """
     try:
         result = orchestrator.handle_task(
@@ -44,15 +44,34 @@ async def orchestrate(request: OrchestratorRequest):
             needs=request.need
         )
 
-        # Unified error handling
+        # --- Unified error handling ---
         if "error_type" in result:
             error_type = result["error_type"]
             if error_type == "ValidationError":
                 raise HTTPException(status_code=400, detail=result)
             elif error_type == "UnknownTask":
-                raise HTTPException(status_code=404, detail=result)
+                # ✅ fallback: treat as classification request
+                fallback_payload = request.payload or {}
+                category = fallback_payload.get("item") or fallback_payload.get("text")
+                classification = orchestrator.handle_task(
+                    "classify_text", {"item": category}, needs=["classify"]
+                )
+                result = {
+                    "task": "fallback_classification",
+                    "steps": classification.get("steps", [])
+                }
             else:
                 raise HTTPException(status_code=500, detail=result)
+
+        # ✅ Save to MongoDB
+        users_collection.update_one(
+            {"clerk_id": user["id"]},
+            {
+                "$push": {"history": {"type": request.task, "output": result}},
+                "$inc": {"points": 3}  # base reward for each text task
+            },
+            upsert=True
+        )
 
         return result
 
@@ -62,35 +81,30 @@ async def orchestrate(request: OrchestratorRequest):
         raise HTTPException(status_code=500, detail={"error": str(e)})
 
 
-
-
+# -------------------- IMAGE HANDLER --------------------
 @router.post("/handle/image")
 async def orchestrate_image(
     file: UploadFile = File(...),
     location: Optional[str] = Query(None, description="Optional user location"),
-    needs: Optional[str] = Query(None, description="Comma-separated list of agents: guide,awareness,quiz")
+    needs: Optional[str] = Query(None, description="Comma-separated list of agents: guide,awareness,quiz"),
+    user=Depends(verify_clerk_token)
 ):
     """
-    Orchestrator endpoint for image input.
-    Always classifies first, then runs additional agents based on 'needs'.
-    Example: ?needs=guide,awareness
+    Handles image-based classification and optional awareness/recycling/quiz.
     """
     temp_file_path = None
     try:
-        # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.filename.split('.')[-1]}") as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_file_path = temp_file.name
 
-        # Step 1: Always classify
         classification_result = orchestrator.handle_task("classify_image", {"image_path": temp_file_path})
         if not classification_result.get("steps"):
             return {"error_type": "ClassificationError", "detail": "Could not classify image"}
 
         classification = classification_result["steps"][0]["output"]
 
-        # Step 2: Decide which agents to run
         needs_list = [n.strip().lower() for n in needs.split(",")] if needs else ["guide", "awareness"]
         steps = [{"agent": "classifier", "output": classification}]
 
@@ -106,7 +120,25 @@ async def orchestrate_image(
             quiz = orchestrator.handle_task("quiz", {"topic": classification})
             steps.append({"agent": "quiz", "output": quiz["steps"][0]["output"]})
 
-        return {"task": "classify_image", "steps": steps}
+        response = {"task": "classify_image", "steps": steps}
+
+        # ✅ Save classification and award points
+        users_collection.update_one(
+            {"clerk_id": user["id"]},
+            {
+                "$push": {
+                    "history": {
+                        "type": "image_classification",
+                        "classification": classification,
+                        "details": response
+                    }
+                },
+                "$inc": {"points": 5}  # +5 points per image classification
+            },
+            upsert=True
+        )
+
+        return response
 
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": str(e)})
@@ -115,27 +147,43 @@ async def orchestrate_image(
             os.unlink(temp_file_path)
 
 
-# Add this new endpoint after your existing routes
+# -------------------- QUIZ VALIDATION --------------------
 @router.post("/quiz/answer")
-async def handle_quiz_answer(request: QuizAnswerRequest):
-    """
-    Handle quiz answer validation without re-running the quiz agent.
-    This prevents the orchestrator from generating a new quiz when checking answers.
-    """
+async def handle_quiz_answer(request: QuizAnswerRequest, user=Depends(verify_clerk_token)):
+    """Validates quiz answers and rewards correct responses."""
     try:
         quiz_data = request.quiz_data
         selected_answer = request.selected_answer
 
-        # Extract quiz components from the original quiz data
-        correct_answer = quiz_data.get('correct_answer', '')
-        explanation = quiz_data.get('explanation', '')
-        question = quiz_data.get('question', '')
-        options = quiz_data.get('options', {})
+        correct_answer = quiz_data.get("correct_answer", "")
+        explanation = quiz_data.get("explanation", "")
+        question = quiz_data.get("question", "")
+        is_correct = selected_answer.strip().upper() == correct_answer.strip().upper()
 
-        # Validate the answer (case-insensitive comparison)
-        is_correct = (selected_answer.strip().upper() == correct_answer.strip().upper())
+        # ✅ Reward points if correct
+        if is_correct:
+            users_collection.update_one(
+                {"clerk_id": user["id"]},
+                {"$inc": {"points": 10}},
+                upsert=True
+            )
 
-        # Return only validation result - NO AGENT EXECUTION
+        # ✅ Save attempt history
+        users_collection.update_one(
+            {"clerk_id": user["id"]},
+            {"$push": {
+                "history": {
+                    "type": "quiz_attempt",
+                    "question": question,
+                    "selected_answer": selected_answer,
+                    "correct_answer": correct_answer,
+                    "is_correct": is_correct,
+                    "explanation": explanation
+                }
+            }},
+            upsert=True
+        )
+
         return {
             "task": "quiz_answer_validation",
             "steps": [
