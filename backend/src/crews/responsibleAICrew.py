@@ -76,8 +76,8 @@ class ResponsibleAICrew:
                 # fallback if LLM didn't output JSON
                 parsed = {
                     "status": "pass",
-                    "fairness": "✅ Same recycling guidance provided for all users.",
-                    "accessibility": "✅ Explanations simplified for general users.",
+                    "fairness": " Same recycling guidance provided for all users.",
+                    "accessibility": " Explanations simplified for general users.",
                     "agents_executed": [s["agent"] for s in steps]
                 }
 
@@ -91,8 +91,8 @@ class ResponsibleAICrew:
             # Fallback if CrewAI fails
             return {
                 "status": "pass",
-                "fairness": "✅ Same recycling guidance provided for all users.",
-                "accessibility": "✅ Explanations simplified for general users.",
+                "fairness": " Same recycling guidance provided for all users.",
+                "accessibility": " Explanations simplified for general users.",
                 "agents_executed": [s["agent"] for s in steps],
                 "sources": []
             }

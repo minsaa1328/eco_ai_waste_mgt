@@ -82,7 +82,7 @@ export const Dashboard = () => {
         value: '3%',
         positive: true
       }} icon={<RecycleIcon size={20} className="text-green-600" />} />
-        <StatCard title="Awareness Tips Viewed" value={15} trend={{
+        <StatCard title="Quiz Tips Viewed" value={15} trend={{
         value: '2%',
         positive: false
       }} icon={<LeafIcon size={20} className="text-green-600" />} />

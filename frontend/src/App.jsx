@@ -4,14 +4,14 @@ import { TopNav } from './components/layout/TopNav';
 import { Dashboard } from './components/pages/Dashboard';
 import { Classifier } from './components/pages/Classifier';
 import { RecyclingGuide } from './components/pages/RecyclingGuide';
-import { Awareness } from './components/pages/Awareness';
+import { Quiz } from './components/pages/quiz.jsx';
 import { Reports } from './components/pages/Reports';
 import { Settings } from './components/pages/Settings';
 import { HomePage } from './components/pages/HomePage';
 import { RewardsAndCommercial } from './components/pages/RewardsAndCommercial';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 
-// ✅ Import missing React Router components
+// Import missing React Router components
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 function AuthGuard({ children }) {
@@ -58,7 +58,7 @@ export function App() {
               }
             />
             <Route path="/recycling-guide" element={<RecyclingGuide />} />
-            <Route path="/awareness" element={<Awareness />} />
+            <Route path="/quiz" element={<Quiz />} />
             <Route path="/rewards" element={<RewardsAndCommercial />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />

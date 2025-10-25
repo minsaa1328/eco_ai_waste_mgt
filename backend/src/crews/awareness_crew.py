@@ -8,9 +8,9 @@ load_dotenv()
 
 class AwarenessCrew:
     def __init__(self):
-        # Define the Awareness Agent
+        # Define the Quiz Agent
         self.awareness_agent = Agent(
-            role='Environmental Awareness Educator',
+            role='Environmental Quiz Educator',
             goal='Create engaging, motivational, and educational content about waste management to inspire behavior change',
             backstory="""You are a passionate environmental educator and communication expert.""",
             # llm=LLM(model="gpt-3.5-turbo"),
@@ -26,7 +26,7 @@ class AwarenessCrew:
             verbose=True
         )
 
-        # Task 1: Generate an Awareness Fact/Tip
+        # Task 1: Generate an Quiz Fact/Tip
         self.awareness_task = Task(
             description="""Generate a short, engaging, and motivational awareness message about waste management.
             The message should be based on this context: {input}""",
@@ -63,7 +63,7 @@ class AwarenessCrew:
             result = self.awareness_crew.kickoff(inputs={"input": context})
             return result.raw if hasattr(result, 'raw') else str(result)
         except Exception as e:
-            print(f"❌ Awareness tip error: {e}")
+            print(f"❌ Quiz tip error: {e}")
             fallback_tips = [
                 "Great job! Recycling helps reduce landfill waste and conserve natural resources. ♻️",
                 "Awesome! Every recycled item makes a difference for our planet. 🌍",
@@ -98,7 +98,7 @@ class AwarenessCrew:
                 'explanation': quiz_data.get('explanation', 'This is the explanation.')
             }
 
-            return json.dumps(normalized_data)
+            return normalized_data
 
         except Exception as e:
             print(f"❌ Quiz generation error: {e}")

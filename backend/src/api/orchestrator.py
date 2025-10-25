@@ -1,4 +1,6 @@
 import os, tempfile
+import re
+
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends
 from pydantic import BaseModel
 from typing import Dict, Optional, Any
@@ -118,25 +120,31 @@ async def orchestrate_image(
 
         if "quiz" in needs_list:
             quiz = orchestrator.handle_task("quiz", {"topic": classification})
-            steps.append({"agent": "quiz", "output": quiz["steps"][0]["output"]})
+            if quiz and isinstance(quiz.get("steps"), list) and len(quiz["steps"]) > 0:
+                steps.append({"agent": "quiz", "output": quiz["steps"][0]["output"]})
+            else:
+                print("⚠️ Quiz agent returned invalid or empty response:", quiz)
 
         response = {"task": "classify_image", "steps": steps}
 
         # ✅ Save classification and award points
-        users_collection.update_one(
-            {"clerk_id": user["id"]},
-            {
-                "$push": {
-                    "history": {
-                        "type": "image_classification",
-                        "classification": classification,
-                        "details": response
-                    }
+        try:
+            users_collection.update_one(
+                {"clerk_id": user["id"]},
+                {
+                    "$push": {
+                        "history": {
+                            "type": "image_classification",
+                            "classification": classification,
+                            "details": response
+                        }
+                    },
+                    "$inc": {"points": 5}
                 },
-                "$inc": {"points": 5}  # +5 points per image classification
-            },
-            upsert=True
-        )
+                upsert=True
+            )
+        except Exception as e:
+            print("⚠️ MongoDB update failed:", e)
 
         return response
 
@@ -149,18 +157,48 @@ async def orchestrate_image(
 
 # -------------------- QUIZ VALIDATION --------------------
 @router.post("/quiz/answer")
-async def handle_quiz_answer(request: QuizAnswerRequest, user=Depends(verify_clerk_token)):
-    """Validates quiz answers and rewards correct responses."""
+async def handle_quiz_answer(request: dict, user=Depends(verify_clerk_token)):
+    """
+    Validates a quiz answer and rewards points for correct responses.
+    Now includes Clerk JWT verification and robust A–D normalization.
+    """
     try:
-        quiz_data = request.quiz_data
-        selected_answer = request.selected_answer
-
-        correct_answer = quiz_data.get("correct_answer", "")
+        quiz_data = request.get("quiz_data", {})
+        selected_answer = str(request.get("selected_answer", "")).strip()
+        correct_answer = str(quiz_data.get("correct_answer", "")).strip()
         explanation = quiz_data.get("explanation", "")
         question = quiz_data.get("question", "")
-        is_correct = selected_answer.strip().upper() == correct_answer.strip().upper()
 
-        # ✅ Reward points if correct
+        if not quiz_data:
+            raise HTTPException(status_code=400, detail="Missing quiz data.")
+
+        # --- Extract A–D letter from answers, regardless of format ---
+        def extract_letter(answer: str) -> str:
+            if not answer:
+                return ""
+            # Handle "A)", "B ) Something", etc.
+            m = re.match(r"^\s*([A-Da-d])\s*\)", answer)
+            if m:
+                return m.group(1).upper()
+            # Fallback: find the first valid A–D letter anywhere
+            for c in answer:
+                if c.upper() in ["A", "B", "C", "D"]:
+                    return c.upper()
+            return ""
+
+        selected_key = extract_letter(selected_answer)
+        correct_key = extract_letter(correct_answer)
+        is_correct = selected_key == correct_key
+
+        print("──────────────────────────────────────")
+        print(f"🔹 Authenticated user: {user.get('id', 'unknown')}")
+        print(f"🔹 Selected: '{selected_answer}' → '{selected_key}'")
+        print(f"🔹 Correct:  '{correct_answer}' → '{correct_key}'")
+        print(f"✅ Match? {is_correct}")
+        print("──────────────────────────────────────")
+
+        # --- Reward points if correct ---
+        from src.db import users_collection
         if is_correct:
             users_collection.update_one(
                 {"clerk_id": user["id"]},
@@ -168,15 +206,15 @@ async def handle_quiz_answer(request: QuizAnswerRequest, user=Depends(verify_cle
                 upsert=True
             )
 
-        # ✅ Save attempt history
+        # --- Log quiz attempt history ---
         users_collection.update_one(
             {"clerk_id": user["id"]},
             {"$push": {
                 "history": {
                     "type": "quiz_attempt",
                     "question": question,
-                    "selected_answer": selected_answer,
-                    "correct_answer": correct_answer,
+                    "selected_answer": selected_key,
+                    "correct_answer": correct_key,
                     "is_correct": is_correct,
                     "explanation": explanation
                 }
@@ -191,8 +229,8 @@ async def handle_quiz_answer(request: QuizAnswerRequest, user=Depends(verify_cle
                     "agent": "quiz_validator",
                     "output": {
                         "is_correct": is_correct,
-                        "selected_answer": selected_answer,
-                        "correct_answer": correct_answer,
+                        "selected": selected_key,
+                        "correct": correct_key,
                         "explanation": explanation,
                         "question": question
                     }
@@ -200,5 +238,8 @@ async def handle_quiz_answer(request: QuizAnswerRequest, user=Depends(verify_cle
             ]
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": str(e)})
+        print(f"❌ Quiz answer validation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")

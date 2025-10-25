@@ -12,16 +12,16 @@ from src.api.orchestrator import router as orchestrator_router
 # Load environment variables
 load_dotenv()
 
-# ✅ Configure OpenAI / LiteLLM key
+# Configure OpenAI / LiteLLM key
 openai_key = os.getenv("OPENAI_API_KEY")
 if openai_key:
     litellm.openai_key = openai_key
     os.environ["OPENAI_API_KEY"] = openai_key
-    print("✅ OpenAI API key configured for LiteLLM")
+    print("OpenAI API key configured for LiteLLM")
 else:
-    print("❌ OPENAI_API_KEY not found in environment variables")
+    print("OPENAI_API_KEY not found in environment variables")
 
-# ✅ Temporary compatibility patch for Python 3.13
+# Temporary compatibility patch for Python 3.13
 import collections
 import collections.abc
 for name in ["Mapping", "MutableMapping", "Sequence"]:
