@@ -4,7 +4,7 @@ import './index.css';
 import { App } from './App';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { BrowserRouter } from 'react-router-dom';
-import process from "prop-types/prop-types.js";
+//import process from "prop-types/prop-types.js";
 
 // Read publishable key from environment
 const PUBLISHABLE_KEY =

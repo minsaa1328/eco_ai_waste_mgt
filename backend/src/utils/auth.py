@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
-CLERK_ISSUER = "https://decent-mutt-59.clerk.accounts.dev"
+CLERK_ISSUER = "https://united-roughy-82.clerk.accounts.dev"
 
 
 async def verify_clerk_token(authorization: str = Header(None)):
