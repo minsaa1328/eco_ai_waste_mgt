@@ -1,4 +1,5 @@
 import os
+import sys
 import litellm
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,12 @@ from .utils.auth import verify_clerk_token
 from src.api import users_router
 from src.api.orchestrator import router as orchestrator_router
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# --- Routers ---
+from src.api import users_router
+from src.api.orchestrator import router as orchestrator_router
+from src.api.leaderboard_router import router as leaderboard_router
+from src.api.rewards_router import router as rewards_router
 # Load environment variables
 load_dotenv()
 
@@ -52,6 +59,8 @@ app.add_middleware(
 # --- Include Routers ---
 app.include_router(users_router.router, prefix="/api/users", tags=["Users"])
 app.include_router(orchestrator_router, prefix="/api/orchestrator", tags=["Orchestrator"])
+app.include_router(leaderboard_router)
+app.include_router(rewards_router)
 
 # --- Health & Root ---
 @app.get("/")
@@ -61,6 +70,29 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "eco-ai-waste-manager"}
+
+# --- Run locally ---
+# Add to your main.py
+@app.get("/debug/user/{clerk_id}")
+async def debug_user(clerk_id: str):
+    """Debug endpoint to check specific user structure"""
+    from src.db import users_collection
+    user = users_collection.find_one({"clerk_id": clerk_id})
+    if user:
+        user["_id"] = str(user["_id"])
+        return {"user": user}
+    else:
+        return {"error": "User not found"}
+
+# --- Debug endpoint to check rewards ---
+@app.get("/debug/rewards")
+async def debug_rewards():
+    """Debug endpoint to check all rewards in database"""
+    from src.db import rewards_collection
+    rewards = list(rewards_collection.find())
+    for reward in rewards:
+        reward["_id"] = str(reward["_id"])
+    return {"rewards": rewards}
 
 # --- Run locally ---
 if __name__ == "__main__":
