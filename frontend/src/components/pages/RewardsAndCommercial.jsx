@@ -4,13 +4,14 @@ import { Badge } from '../ui/Badge.jsx';
 import {
   TrophyIcon, AwardIcon, RecycleIcon, LeafIcon, UserIcon, StarIcon,
   CheckIcon, XIcon, BriefcaseIcon, BuildingIcon, CreditCardIcon,
-  RefreshCwIcon, GiftIcon, PackageIcon, ShoppingCartIcon
+  RefreshCwIcon, GiftIcon, PackageIcon, ShoppingCartIcon,
+  LockIcon, BookOpenIcon, ShoppingBagIcon
 } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Reward Redemption Modal Component
+// Reward Redemption Modal Component (unchanged)
 const RewardRedemptionModal = ({ reward, userPoints, onClose, onRedeem }) => {
   const [shippingAddress, setShippingAddress] = useState({
     fullName: '',
@@ -154,8 +155,8 @@ const RewardRedemptionModal = ({ reward, userPoints, onClose, onRedeem }) => {
   );
 };
 
-// Rewards Store Component
-const RewardsStore = ({ userPoints, onRedeem }) => {
+// Updated RewardsStore Component with Buy Now buttons
+const RewardsStore = ({ userPoints, onRedeem, onUpgradeToPro }) => {
   const [rewards, setRewards] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -192,6 +193,9 @@ const RewardsStore = ({ userPoints, onRedeem }) => {
     ? rewards
     : rewards.filter(reward => reward.category === selectedCategory);
 
+  // Check if user has Pro features access (you can modify this based on your user plan)
+  const hasProAccess = false; // This should come from user data
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -202,6 +206,29 @@ const RewardsStore = ({ userPoints, onRedeem }) => {
 
   return (
     <div className="space-y-6">
+      {/* Pro Plan Banner */}
+      {!hasProAccess && (
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-4 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <StarIcon size={24} className="text-yellow-300" />
+              <div>
+                <h3 className="font-bold text-lg">Unlock Premium Rewards!</h3>
+                <p className="text-orange-100 text-sm">
+                  Upgrade to Pro plan to access exclusive keytags, courses, and merchandise
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onUpgradeToPro}
+              className="bg-white text-orange-600 px-4 py-2 rounded-lg font-semibold hover:bg-orange-50 transition-colors"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
         {categories.map(category => (
@@ -221,57 +248,135 @@ const RewardsStore = ({ userPoints, onRedeem }) => {
 
       {/* Rewards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRewards.map(reward => (
-          <div key={reward._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="h-48 overflow-hidden">
-              <img
-                src={reward.image}
-                alt={reward.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-800">{reward.name}</h3>
-                <Badge color={reward.category === 'keytag' ? 'green' : 'blue'}>
-                  {reward.category}
-                </Badge>
-              </div>
-              <p className="text-sm text-gray-600 mb-3">{reward.description}</p>
+        {filteredRewards.map(reward => {
+          const isProOnly = reward.category === 'keytag' || reward.category === 'merchandise' || reward.category === 'digital';
+          const canRedeem = userPoints >= reward.points_required && reward.stock !== 0;
 
-              <div className="flex justify-between items-center mb-3">
-                <div className="flex items-center">
-                  <StarIcon size={16} className="text-yellow-500 mr-1" />
-                  <span className="font-semibold">{reward.points_required} points</span>
+          return (
+            <div key={reward._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+              {/* Pro Badge */}
+              {isProOnly && !hasProAccess && (
+                <div className="bg-orange-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 text-center">
+                  Pro Exclusive
                 </div>
-                {reward.stock > 0 && (
-                  <span className="text-xs text-green-600">{reward.stock} left</span>
-                )}
-                {reward.stock === 0 && (
-                  <span className="text-xs text-red-600">Out of stock</span>
+              )}
+
+              <div className="h-48 overflow-hidden relative">
+                <img
+                  src={reward.image}
+                  alt={reward.name}
+                  className="w-full h-full object-cover"
+                />
+                {isProOnly && !hasProAccess && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="text-white text-center p-4">
+                      <LockIcon size={32} className="mx-auto mb-2" />
+                      <p className="font-semibold">Pro Feature</p>
+                      <p className="text-sm">Upgrade to unlock</p>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              <button
-                onClick={() => onRedeem(reward)}
-                disabled={userPoints < reward.points_required || reward.stock === 0}
-                className={`w-full py-2 rounded-lg font-medium transition-colors ${
-                  userPoints < reward.points_required || reward.stock === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-orange-500 hover:bg-orange-600 text-white'
-                }`}
-              >
-                {userPoints < reward.points_required ? 'Need More Points' : 'Redeem Now'}
-              </button>
+              <div className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-gray-800">{reward.name}</h3>
+                  <Badge color={
+                    reward.category === 'keytag' ? 'green' :
+                    reward.category === 'digital' ? 'blue' :
+                    reward.category === 'merchandise' ? 'purple' : 'gray'
+                  }>
+                    {reward.category}
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">{reward.description}</p>
+
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center">
+                    <StarIcon size={16} className="text-yellow-500 mr-1" />
+                    <span className="font-semibold">{reward.points_required} points</span>
+                  </div>
+                  {reward.stock > 0 && (
+                    <span className="text-xs text-green-600">{reward.stock} left</span>
+                  )}
+                  {reward.stock === 0 && (
+                    <span className="text-xs text-red-600">Out of stock</span>
+                  )}
+                </div>
+
+                {/* Action Button */}
+                {isProOnly && !hasProAccess ? (
+                  <button
+                    onClick={onUpgradeToPro}
+                    className="w-full py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <StarIcon size={16} className="mr-2" />
+                    Upgrade to Pro
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onRedeem(reward)}
+                    disabled={!canRedeem}
+                    className={`w-full py-2 rounded-lg font-medium transition-colors ${
+                      !canRedeem
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-orange-500 hover:bg-orange-600 text-white'
+                    }`}
+                  >
+                    {userPoints < reward.points_required ? 'Need More Points' : 'Redeem Now'}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredRewards.length === 0 && (
         <div className="text-center py-12">
           <GiftIcon size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500">No rewards found in this category</p>
+        </div>
+      )}
+
+      {/* Pro Features Explanation */}
+      {!hasProAccess && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-8">
+          <div className="text-center mb-4">
+            <BriefcaseIcon size={32} className="mx-auto text-blue-500 mb-2" />
+            <h3 className="text-xl font-bold text-gray-800">Pro Plan Benefits</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <GiftIcon size={24} className="text-green-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800">Exclusive Keytags</h4>
+              <p className="text-sm text-gray-600">Limited edition eco-keytags</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <BookOpenIcon size={24} className="text-blue-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800">Premium Courses</h4>
+              <p className="text-sm text-gray-600">Advanced environmental courses</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <ShoppingBagIcon size={24} className="text-purple-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800">Eco Merchandise</h4>
+              <p className="text-sm text-gray-600">Sustainable products & gear</p>
+            </div>
+          </div>
+          <div className="text-center mt-4">
+            <button
+              onClick={onUpgradeToPro}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors"
+            >
+              Upgrade to Pro - ₨ 1,500/month
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -382,27 +487,21 @@ export const RewardsAndCommercial = () => {
     }
   };
 
-  // Add test points (for development)
-  const addTestPoints = async (points = 10) => {
-    if (!user) return;
+  // Handle upgrade to Pro
+  const handleUpgradeToPro = () => {
+    // Scroll to pricing section
+    document.getElementById('pricing-section')?.scrollIntoView({
+      behavior: 'smooth'
+    });
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/users/points/add`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ points })
-      });
-
-      if (response.ok) {
-        // Refresh data to show updated points
-        await refreshData();
-      }
-    } catch (error) {
-      console.error('Error adding points:', error);
-      setError('Failed to add points');
-    }
+    // You can also add logic to highlight the Pro plan
+    setTimeout(() => {
+      const proPlan = document.querySelector('[data-plan="pro"]');
+      proPlan?.classList.add('ring-4', 'ring-orange-300');
+      setTimeout(() => {
+        proPlan?.classList.remove('ring-4', 'ring-orange-300');
+      }, 2000);
+    }, 500);
   };
 
   useEffect(() => {
@@ -438,14 +537,14 @@ export const RewardsAndCommercial = () => {
     }
   };
 
-  // Sample pricing plans
+  // Updated pricing plans - removed Enterprise plan
   const pricingPlans = [{
     name: 'Free',
     price: 'Free',
     description: 'Basic features for eco-conscious individuals',
     icon: <LeafIcon size={28} className="text-green-500" />,
-    features: ['Waste classification', 'Environmental awareness content', 'Basic eco quiz access', 'Community forums'],
-    notIncluded: ['Leaderboard participation', 'Advanced analytics', 'Reward redemption', 'Premium content'],
+    features: ['Waste classification', 'Environmental awareness content', 'Basic eco quiz access', 'Community forums','Leaderboard participation'],
+    notIncluded: ['Advanced analytics', 'Reward redemption', 'Premium content'],
     buttonText: 'Current Plan',
     buttonColor: 'bg-gray-200 text-gray-700',
     popular: false
@@ -455,21 +554,11 @@ export const RewardsAndCommercial = () => {
     period: 'month',
     description: 'Advanced features for dedicated eco-enthusiasts',
     icon: <BriefcaseIcon size={28} className="text-blue-500" />,
-    features: ['All Free features', 'Leaderboard participation', 'Personalized eco analytics', 'Reward redemption', 'Premium educational content'],
-    notIncluded: ['Custom branding', 'API access'],
+    features: ['All Free features', 'Advanced analytics', 'Reward redemption', 'Premium content'],
+    notIncluded: [],
     buttonText: 'Upgrade Now',
     buttonColor: 'bg-orange-500 hover:bg-orange-600 text-white',
     popular: true
-  }, {
-    name: 'Enterprise',
-    price: 'Custom',
-    description: 'Complete solution for organizations and institutions',
-    icon: <BuildingIcon size={28} className="text-purple-500" />,
-    features: ['All Pro features', 'Custom branding', 'API access', 'Dedicated support', 'Bulk user management', 'Custom analytics and reporting'],
-    notIncluded: [],
-    buttonText: 'Contact Sales',
-    buttonColor: 'bg-gray-800 hover:bg-gray-700 text-white',
-    popular: false
   }];
 
   if (loading) {
@@ -486,15 +575,7 @@ export const RewardsAndCommercial = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Rewards & Premium</h1>
         <div className="flex gap-2">
-          {/* Test button for development */}
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              onClick={() => addTestPoints(10)}
-              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
-            >
-              +10 Test Points
-            </button>
-          )}
+          {/* Removed test points buttons */}
           <button
             onClick={refreshData}
             disabled={refreshing}
@@ -660,14 +741,7 @@ export const RewardsAndCommercial = () => {
                   Redeem Your Rewards
                 </button>
 
-                {process.env.NODE_ENV === 'development' && (
-                  <button
-                    onClick={() => addTestPoints(25)}
-                    className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
-                  >
-                    🚀 Quick +25 Points (Test)
-                  </button>
-                )}
+                {/* Removed Quick +25 Points button */}
               </div>
 
               {/* Tip Box */}
@@ -753,6 +827,7 @@ export const RewardsAndCommercial = () => {
           <RewardsStore
             userPoints={userPoints.current}
             onRedeem={setSelectedReward}
+            onUpgradeToPro={handleUpgradeToPro}
           />
         </Card>
       )}
@@ -769,24 +844,40 @@ export const RewardsAndCommercial = () => {
 
       {/* Pricing & Commercialization Cards */}
       {!showRewardsStore && (
-        <div className="mt-8">
+        <div id="pricing-section" className="mt-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800">
               Upgrade Your Eco Journey
             </h2>
             <p className="text-gray-600 mt-2 max-w-2xl mx-auto">
               Choose the plan that fits your sustainability goals and get access
-              to premium features
+              to premium features including exclusive keytags, courses, and merchandise
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {pricingPlans.map(plan => (
-              <div key={plan.name} className={`bg-white rounded-xl shadow-sm border ${plan.popular ? 'border-orange-200 ring-2 ring-orange-500 ring-opacity-50' : 'border-gray-100'} overflow-hidden hover:shadow-md transition-shadow`}>
+              <div
+                key={plan.name}
+                data-plan={plan.name.toLowerCase()}
+                className={`bg-white rounded-xl shadow-sm border ${
+                  plan.popular ? 'border-orange-200 ring-2 ring-orange-500 ring-opacity-50' : 'border-gray-100'
+                } overflow-hidden hover:shadow-md transition-shadow relative`}
+              >
                 {plan.popular && (
                   <div className="bg-orange-500 text-white text-xs font-bold uppercase tracking-wider py-2 text-center">
                     Most Popular
                   </div>
                 )}
+
+                {/* Pro Exclusive Badge */}
+                {plan.name === 'Pro' && (
+                  <div className="absolute top-4 right-4">
+                    <Badge color="orange" className="text-xs">
+                      Keytags & More
+                    </Badge>
+                  </div>
+                )}
+
                 <div className="p-6">
                   <div className="flex items-center mb-4">
                     <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center mr-4">
@@ -809,6 +900,21 @@ export const RewardsAndCommercial = () => {
                     </div>
                   </div>
                   <p className="text-gray-600 text-sm mb-6">{plan.description}</p>
+
+                  {/* Special Pro Features */}
+                  {plan.name === 'Pro' && (
+                    <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                      <h4 className="font-semibold text-orange-800 text-sm mb-2">
+                        🎁 Exclusive Rewards Access:
+                      </h4>
+                      <ul className="text-xs text-orange-700 space-y-1">
+                        <li>• Premium Keytags Collection</li>
+                        <li>• Environmental Courses</li>
+                        <li>• Eco Merchandise & Backpacks</li>
+                      </ul>
+                    </div>
+                  )}
+
                   <div className="space-y-3 mb-6">
                     {plan.features.map((feature, index) => (
                       <div key={index} className="flex items-center">
@@ -823,7 +929,13 @@ export const RewardsAndCommercial = () => {
                       </div>
                     ))}
                   </div>
-                  <button className={`w-full py-3 ${plan.buttonColor} rounded-lg font-medium transition-colors`}>
+
+                  <button
+                    onClick={plan.name === 'Pro' ? handleUpgradeToPro : undefined}
+                    className={`w-full py-3 ${plan.buttonColor} rounded-lg font-medium transition-colors ${
+                      plan.name === 'Pro' ? 'hover:scale-105 transform transition-transform' : ''
+                    }`}
+                  >
                     {plan.buttonText}
                   </button>
                 </div>
