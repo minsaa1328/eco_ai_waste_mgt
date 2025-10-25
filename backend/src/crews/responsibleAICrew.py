@@ -1,6 +1,6 @@
 # backend/src/crews/responsibleAICrew.py
 from crewai import Agent, Task, Crew, Process
-from src.utils.serper_api import search_serper
+from ..utils.serper_api import search_serper
 
 
 class ResponsibleAICrew:

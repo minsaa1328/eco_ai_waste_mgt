@@ -6,16 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from .utils.auth import verify_clerk_token
 
-# --- Routers ---
-from src.api import users_router
-from src.api.orchestrator import router as orchestrator_router
+
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # --- Routers ---
-from src.api import users_router
-from src.api.orchestrator import router as orchestrator_router
-from src.api.leaderboard_router import router as leaderboard_router
-from src.api.rewards_router import router as rewards_router
+from .api import users_router
+from .api.orchestrator import router as orchestrator_router
+from .api.leaderboard_router import router as leaderboard_router
+from .api.rewards_router import router as rewards_router
 # Load environment variables
 load_dotenv()
 
@@ -76,7 +74,7 @@ def health_check():
 @app.get("/debug/user/{clerk_id}")
 async def debug_user(clerk_id: str):
     """Debug endpoint to check specific user structure"""
-    from src.db import users_collection
+    from .db import users_collection
     user = users_collection.find_one({"clerk_id": clerk_id})
     if user:
         user["_id"] = str(user["_id"])
@@ -88,7 +86,7 @@ async def debug_user(clerk_id: str):
 @app.get("/debug/rewards")
 async def debug_rewards():
     """Debug endpoint to check all rewards in database"""
-    from src.db import rewards_collection
+    from .db import rewards_collection
     rewards = list(rewards_collection.find())
     for reward in rewards:
         reward["_id"] = str(reward["_id"])

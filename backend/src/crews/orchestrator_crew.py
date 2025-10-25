@@ -1,7 +1,7 @@
-from src.crews.awareness_crew import AwarenessCrew
-from src.crews.classifier_crew import ClassifierCrew
-from src.crews.recycling_crew import RecyclingCrew
-from src.crews.responsibleAICrew import ResponsibleAICrew
+from ..crews.awareness_crew import AwarenessCrew
+from ..crews.classifier_crew import ClassifierCrew
+from ..crews.recycling_crew import RecyclingCrew
+from ..crews.responsibleAICrew import ResponsibleAICrew
 
 
 class OrchestratorCrew:

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from bson import ObjectId
 
-from src.db import rewards_collection, redemptions_collection, users_collection, client
+from ..db import rewards_collection, redemptions_collection, users_collection, client
 
 
 # Temporary auth function
