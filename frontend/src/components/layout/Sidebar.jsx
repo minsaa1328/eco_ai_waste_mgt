@@ -18,7 +18,7 @@ export const Sidebar = () => {
     { path: "/dashboard", label: "Dashboard", icon: <LayoutDashboardIcon size={20} /> },
     { path: "/classifier", label: "Classifier", icon: <ImageIcon size={20} /> },
     { path: "/recycling-guide", label: "Recycling Guide", icon: <RecycleIcon size={20} /> },
-    { path: "/awareness", label: "Awareness", icon: <LeafIcon size={20} /> },
+    { path: "/awareness", label: "Quiz", icon: <LeafIcon size={20} /> },
     { path: "/rewards", label: "Rewards", icon: <TrophyIcon size={20} /> },
     { path: "/reports", label: "Reports", icon: <BarChart3Icon size={20} /> },
     { path: "/settings", label: "Settings", icon: <SettingsIcon size={20} /> },

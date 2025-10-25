@@ -3,7 +3,7 @@ import streamlit as st
 import requests
 
 st.set_page_config(
-    page_title="🌱 Waste Awareness",
+    page_title="🌱 Waste Quiz",
     page_icon="🌱",
     layout="centered",
     initial_sidebar_state="expanded"
@@ -38,13 +38,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<h1 class="main-header">🌱 Eco Waste Awareness</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🌱 Eco Waste Quiz</h1>', unsafe_allow_html=True)
 st.markdown("Get instant tips, facts, or mini-quizzes about waste management and recycling.")
 
 # Choose request type
 request_type = st.radio("Choose request type:", ("POST - Detailed Tip", "GET - Quick Tip"))
 
-if st.button("💡 Get Awareness Message"):
+if st.button("💡 Get Quiz Message"):
     try:
         if request_type.startswith("POST"):
             response = requests.post("http://localhost:8000/awareness/")
@@ -65,6 +65,6 @@ if st.button("💡 Get Awareness Message"):
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    🌱 Eco Waste Awareness - Powered by FastAPI & Streamlit
+    🌱 Eco Waste Quiz - Powered by FastAPI & Streamlit
 </div>
 """, unsafe_allow_html=True)

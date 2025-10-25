@@ -72,7 +72,7 @@ def get_awareness_crew():
     if _awareness_crew is None:
         try:
             _awareness_crew = AwarenessCrew()
-            print("✅ Awareness crew initialized successfully!")
+            print("✅ Quiz crew initialized successfully!")
         except Exception as e:
             print(f"❌ Crew initialization failed: {e}")
             # Fallback implementation...
@@ -120,14 +120,8 @@ async def get_quiz_question(request: QuizRequest):
 
         topic = request.topic.strip()
         crew = get_awareness_crew()
-        quiz_json = crew.get_quiz_question(topic)
 
-        # Parse the JSON response
-        try:
-            quiz_data = json.loads(quiz_json)
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=500, detail={"error_type": "JSONParseError",
-                                                         "detail": f"Failed to parse quiz response: {str(e)}"})
+        quiz_data = crew.get_quiz_question(topic)
 
         return QuizResponse(
             question=quiz_data.get("question", ""),

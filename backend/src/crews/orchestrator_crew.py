@@ -7,7 +7,7 @@ from src.crews.responsibleAICrew import ResponsibleAICrew
 class OrchestratorCrew:
     """
     Central orchestrator coordinating all AI agents:
-    Classifier, Recycling, Awareness, Quiz, Responsible AI.
+    Classifier, Recycling, Quiz, Quiz, Responsible AI.
     """
 
     def __init__(self):
@@ -51,7 +51,7 @@ class OrchestratorCrew:
             for need in needs:
                 need = need.lower().strip()
 
-                # 1️⃣ Classification
+                # Classification
                 if need in ["classify", "classifier"]:
                     item = payload.get("item") or payload.get("image_path")
                     if not item:
@@ -60,26 +60,26 @@ class OrchestratorCrew:
                     results["steps"].append({"agent": "classifier", "output": category})
                     payload["category"] = category
 
-                # 2️⃣ Recycling
+                #Recycling
                 elif need in ["recycle", "recycling", "guide"]:
                     category = category or payload.get("category", "general")
                     guide = self.recycling.get_guide(category, user_location=payload.get("location"))
                     results["steps"].append({"agent": "recycling", "output": guide})
                     payload["guide"] = guide
 
-                # 3️⃣ Awareness
+                # quiz
                 elif need in ["awareness", "educate", "tip"]:
                     context = context or f"Information about {category or 'waste management'}"
                     tip = self.awareness.get_awareness_tip(context)
                     results["steps"].append({"agent": "awareness", "output": tip})
 
-                # 4️⃣ Quiz
+                # Quiz
                 elif need in ["quiz"]:
                     topic = category or payload.get("topic") or "recycling"
                     quiz = self.awareness.get_quiz_question(topic)
                     results["steps"].append({"agent": "quiz", "output": quiz})
 
-            # ✅ Responsible AI check always last
+            #  Responsible AI check always last
             rai = self.responsible.check(payload, results["steps"])
             results["steps"].append({"agent": "responsible_ai", "output": rai})
             return results

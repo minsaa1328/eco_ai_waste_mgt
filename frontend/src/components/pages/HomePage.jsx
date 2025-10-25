@@ -199,7 +199,7 @@ export const HomePage = () => {
           </div>
         </div>
       </section>
-      {/* Awareness Section */}
+      {/* Quiz Section */}
       <section id="awareness" className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
