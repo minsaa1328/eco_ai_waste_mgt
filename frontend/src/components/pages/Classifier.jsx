@@ -4,12 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Card } from "../ui/Card.jsx";
 import { Badge } from "../ui/Badge.jsx";
+import { ChatAssistant } from "./ChatAssistant.jsx";
 import {
   UploadIcon,
   ImageIcon,
   TrashIcon,
   AlertCircleIcon,
   CheckCircleIcon,
+  MessageCircle,
 } from "lucide-react";
 
 export const Classifier = () => {
@@ -18,6 +20,9 @@ export const Classifier = () => {
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [recyclingGuide, setRecyclingGuide] = useState(null);
+  const [fullClassificationData, setFullClassificationData] = useState(null);
   const navigate = useNavigate();
   const { getToken } = useAuth();
 
@@ -63,6 +68,15 @@ export const Classifier = () => {
       const classifierStep = data.steps?.find(
         (s) => s.agent.toLowerCase() === "classifier"
       );
+      const recyclingStep = data.steps?.find(
+        (s) => s.agent.toLowerCase() === "recycling"
+      );
+
+      // Store full data for chat assistant
+      setFullClassificationData(data);
+      if (recyclingStep) {
+        setRecyclingGuide(recyclingStep.output);
+      }
 
       if (classifierStep) {
         setResult({
@@ -114,6 +128,15 @@ export const Classifier = () => {
       const classifierStep = data.steps?.find(
         (s) => s.agent.toLowerCase() === "classifier"
       );
+      const recyclingStep = data.steps?.find(
+        (s) => s.agent.toLowerCase() === "recycling"
+      );
+
+      // Store full data for chat assistant
+      setFullClassificationData(data);
+      if (recyclingStep) {
+        setRecyclingGuide(recyclingStep.output);
+      }
 
       if (classifierStep) {
         setResult({
@@ -139,6 +162,14 @@ export const Classifier = () => {
     setPreview(null);
     setTextInput("");
     setResult(null);
+    setRecyclingGuide(null);
+    setFullClassificationData(null);
+    setChatOpen(false);
+  };
+
+  const openChatAssistant = () => {
+    if (!result) return;
+    setChatOpen(true);
   };
 
   const goToAwareness = () => {
@@ -321,11 +352,28 @@ export const Classifier = () => {
                 >
                   View Recycling Guide
                 </button>
+
+                {/* Chat Assistant Button */}
+                <button
+                  onClick={openChatAssistant}
+                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <MessageCircle size={20} />
+                  <span>Ask Questions About Recycling</span>
+                </button>
               </div>
             )}
           </Card>
         </div>
       </div>
+
+      {/* Chat Assistant Modal */}
+      <ChatAssistant
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        recyclingGuide={recyclingGuide}
+        wasteCategory={result?.category}
+      />
     </div>
   );
 };

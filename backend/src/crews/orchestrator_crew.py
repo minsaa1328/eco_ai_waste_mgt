@@ -39,6 +39,11 @@ class OrchestratorCrew:
             tip = self.awareness.get_awareness_tip(context)
             return {"steps": [{"agent": "awareness", "output": tip}]}
 
+        if task == "quiz":
+            topic = payload.get("topic") or "recycling"
+            quiz = self.awareness.get_quiz_question(topic)
+            return {"steps": [{"agent": "quiz", "output": quiz}]}
+
         # --- Multi-Agent Custom Flow ---
         if task == "custom":
             if not needs:

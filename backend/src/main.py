@@ -8,6 +8,7 @@ from .utils.auth import verify_clerk_token
 # --- Routers ---
 from src.api import users_router
 from src.api.orchestrator import router as orchestrator_router
+from src.api.chat_assistant import router as chat_assistant_router
 
 # Load environment variables
 load_dotenv()
@@ -41,6 +42,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",       # Vite dev
         "http://127.0.0.1:5173",
+        "http://localhost:5176",       # Alternative Vite port
+        "http://127.0.0.1:5176",
         "http://localhost:8501",       # Streamlit or testing
         "http://127.0.0.1:8501",
     ],
@@ -52,6 +55,7 @@ app.add_middleware(
 # --- Include Routers ---
 app.include_router(users_router.router, prefix="/api/users", tags=["Users"])
 app.include_router(orchestrator_router, prefix="/api/orchestrator", tags=["Orchestrator"])
+app.include_router(chat_assistant_router, prefix="/api/chat", tags=["Chat Assistant"])
 
 # --- Health & Root ---
 @app.get("/")
