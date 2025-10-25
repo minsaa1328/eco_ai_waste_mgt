@@ -1,7 +1,7 @@
 from crewai import Agent, Task, Crew, Process
 import os
 from dotenv import load_dotenv
-from src.utils.serper_api import search_serper
+from ..utils.serper_api import search_serper
 
 # Load environment variables
 load_dotenv()

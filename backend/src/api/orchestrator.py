@@ -6,11 +6,11 @@ from pydantic import BaseModel
 from typing import Dict, Optional, Any
 
 # ✅ Clerk + MongoDB integration
-from src.utils.auth import verify_clerk_token
-from src.db import users_collection
+from ..utils.auth import verify_clerk_token
+from ..db import users_collection
 
 # ✅ Agent orchestrator
-from src.crews.orchestrator_crew import OrchestratorCrew
+from ..crews.orchestrator_crew import OrchestratorCrew
 
 # Initialize router and orchestrator
 router = APIRouter()
@@ -198,7 +198,7 @@ async def handle_quiz_answer(request: dict, user=Depends(verify_clerk_token)):
         print("──────────────────────────────────────")
 
         # --- Reward points if correct ---
-        from src.db import users_collection
+        from ..db import users_collection
         if is_correct:
             users_collection.update_one(
                 {"clerk_id": user["id"]},

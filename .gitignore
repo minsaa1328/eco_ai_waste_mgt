@@ -1,9 +1,32 @@
-# Python
+# ==============================================
+# 🧠 GLOBAL
+# ==============================================
+*.log
+*.tmp
+*.swp
+*.swo
+*~
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
+
+# ==============================================
+# ⚙️ PYTHON / FASTAPI BACKEND
+# ==============================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -15,49 +38,68 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual environments
-.env/
 .venv/
 env/
 venv/
 ENV/
-env.bak/
-venv.bak/
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Local database / storage
+*.db
+*.sqlite3
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Coverage
+# Test and coverage reports
 .coverage
+.tox/
+.nox/
+.pytest_cache/
+coverage.xml
 htmlcov/
 
-# Jupyter
-.ipynb_checkpoints
+# ==============================================
+# 💻 FRONTEND (React + Vite)
+# ==============================================
+# Dependency directories
+frontend/node_modules/
+frontend/.vite/
+frontend/.next/
+frontend/.nuxt/
+frontend/build/
+frontend/dist/
 
-# Streamlit
-.streamlit/
+# Logs and debug
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Local environment
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ==============================================
+# 🧑‍💻 IDEs and Editors
+# ==============================================
+.idea/
+.vscode/
+*.iml
+
+# ==============================================
+# 🖼️ SYSTEM FILES
+# ==============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================================
+# ⚙️ OTHER
+# ==============================================
+# Backup or temporary files
+*.bak
+*.old
+*.orig

@@ -395,7 +395,6 @@ export const Classifier = () => {
                   </div>
                 </div>
 
-                {/* Quiz Tip */}
                 <div
                   className="p-4 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
                   onClick={goToAwareness}

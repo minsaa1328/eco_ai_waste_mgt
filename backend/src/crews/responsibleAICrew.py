@@ -1,6 +1,6 @@
 # backend/src/crews/responsibleAICrew.py
 from crewai import Agent, Task, Crew, Process
-from src.utils.serper_api import search_serper
+from ..utils.serper_api import search_serper
 
 
 class ResponsibleAICrew:
@@ -91,8 +91,8 @@ class ResponsibleAICrew:
             # Fallback if CrewAI fails
             return {
                 "status": "pass",
-                "fairness": " Same recycling guidance provided for all users.",
-                "accessibility": " Explanations simplified for general users.",
+                "fairness": "✅ Same recycling guidance provided for all users.",
+                "accessibility": "✅ Explanations simplified for general users.",
                 "agents_executed": [s["agent"] for s in steps],
                 "sources": []
             }
