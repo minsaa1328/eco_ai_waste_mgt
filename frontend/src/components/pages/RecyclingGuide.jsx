@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
 import { Card } from "../ui/Card.jsx";
+import { sendChatMessage, getChatHistory } from "../../api/chat.js";
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -18,6 +19,7 @@ import {
   LeafIcon,
   TrashIcon,
   TrophyIcon,
+  MessageCircle,
 } from "lucide-react";
 import { useAuth } from '@clerk/clerk-react';
 
@@ -25,20 +27,19 @@ export const RecyclingGuide = () => {
   const location = useLocation();
   const { item, category } = location.state || {}; // ← Data passed from Classifier
   const [selectedCategory, setSelectedCategory] = useState(category || "plastic");
-  const [chatMessages, setChatMessages] = useState([
-    {
-      sender: "ai",
-      text: "Hello! I'm your EcoGuide Assistant. Ask me anything about waste management, recycling, or eco-awareness!",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const chatEndRef = useRef(null);
   const [currentFact, setCurrentFact] = useState(0);
   const [dynamicGuide, setDynamicGuide] = useState(null);
   const [loadingGuide, setLoadingGuide] = useState(false);
+  const [recyclingGuideText, setRecyclingGuideText] = useState(null);
+
+  // Chat state for inline chat UI
+  const [chatMessages, setChatMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
   const { getToken } = useAuth();
 
   const API_URL = import.meta.env.VITE_API_URL + "/api/orchestrator";
@@ -72,6 +73,52 @@ export const RecyclingGuide = () => {
     if (category || item) fetchInitialGuide();
   }, [category, item]);
 
+  // 📜 Load chat history when chat is opened
+  useEffect(() => {
+    if (showChat && chatMessages.length === 0) {
+      loadChatHistory();
+    }
+  }, [showChat]);
+
+  // 📜 Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages]);
+
+  const loadChatHistory = async () => {
+    try {
+      setChatLoading(true);
+      const token = await getToken();
+      const data = await getChatHistory(token, 10);
+
+      if (data.history && data.history.length > 0) {
+        const formattedHistory = data.history.flatMap(item => [
+          { sender: 'user', text: item.user_message, timestamp: new Date(item.timestamp) },
+          { sender: 'ai', text: item.assistant_response, timestamp: new Date(item.timestamp) }
+        ]);
+        setChatMessages(formattedHistory);
+      } else {
+        // Welcome message if no history
+        setChatMessages([{
+          sender: "ai",
+          text: "Hello! I'm your EcoGuide Assistant. Ask me anything about waste management, recycling, or eco-awareness!",
+          timestamp: new Date(),
+        }]);
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+      setChatMessages([{
+        sender: "ai",
+        text: "Hello! I'm your EcoGuide Assistant. Ask me anything about waste management, recycling, or eco-awareness!",
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const fetchInitialGuide = async () => {
     try {
       setLoadingGuide(true);
@@ -103,14 +150,8 @@ export const RecyclingGuide = () => {
       };
 
       setDynamicGuide(combinedOutput);
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          sender: "ai",
-          text: `♻️ ${combinedOutput.recycling}\n\n💡 ${combinedOutput.awareness}`,
-          timestamp: new Date(),
-        },
-      ]);
+      // Store recycling guide for Chat Assistant
+      setRecyclingGuideText(recyclingStep?.output || null);
     } catch (error) {
       console.error("Initial guide fetch failed:", error);
     } finally {
@@ -118,9 +159,9 @@ export const RecyclingGuide = () => {
     }
   };
 
-  // 💬 Chat send
+  // 💬 Send message using new Chat Assistant API
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isTyping) return;
 
     const userMessage = {
       sender: "user",
@@ -133,40 +174,27 @@ export const RecyclingGuide = () => {
 
     try {
       const token = await getToken();
-      const payload = {
-        task: "custom",
-        need: ["recycle", "awareness"],
-        payload: { item: inputMessage, category: selectedCategory },
-      };
-      const res = await axios.post(`${API_URL}/handle`, payload, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const steps = res.data.steps || [];
-      const recyclingStep = steps.find((s) => s.agent === "recycling");
-      const awarenessStep = steps.find((s) => s.agent === "awareness");
 
-      const aiResponseText = [
-        recyclingStep?.output ? `♻️ ${recyclingStep.output}` : "",
-        awarenessStep?.output ? `💡 ${awarenessStep.output}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n");
+      // Use new Chat Assistant API
+      const response = await sendChatMessage(
+        token,
+        inputMessage,
+        recyclingGuideText,
+        category || selectedCategory
+      );
 
       setChatMessages((prev) => [
         ...prev,
         {
           sender: "ai",
-          text: aiResponseText || "I couldn't find an exact answer. Try rephrasing!",
+          text: response.response,
           timestamp: new Date(),
         },
       ]);
 
       setCurrentFact((prev) => (prev + 1) % ecoFacts.length);
     } catch (error) {
-      console.error("Backend error:", error);
+      console.error("Chat error:", error);
       setChatMessages((prev) => [
         ...prev,
         {
@@ -185,12 +213,6 @@ export const RecyclingGuide = () => {
     setTimeout(() => handleSendMessage(), 300);
   };
 
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatMessages]);
-
   const currentGuide = {
     title: `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Recycling Guide`,
     description: dynamicGuide
@@ -204,17 +226,17 @@ export const RecyclingGuide = () => {
 
       {/* Category Toggle */}
       <div className="flex flex-wrap gap-2">
-        {categories.map((category) => (
+        {categories.map((cat) => (
           <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.id)}
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              selectedCategory === category.id
-                ? `bg-${category.color}-100 text-${category.color}-800 border border-${category.color}-300`
+              selectedCategory === cat.id
+                ? `bg-${cat.color}-100 text-${cat.color}-800 border border-${cat.color}-300`
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            {category.name}
+            {cat.name}
           </button>
         ))}
         <button
@@ -278,105 +300,113 @@ export const RecyclingGuide = () => {
           </Card>
         </div>
       ) : (
-        /* 💬 Chat Mode */
+        /* 💬 Inline Chat Mode with New Backend Integration */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
             <div className="flex flex-col h-[600px]">
-              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
-                {chatMessages.map((message, i) => (
-                  <div key={i} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
-                        message.sender === "user"
-                          ? "bg-[#FFF8E7] text-gray-800"
-                          : "bg-[#E7F7E2] text-gray-800"
-                      }`}
-                    >
-                      {message.sender === "ai" && (
-                        <div className="flex items-center mb-1.5">
-                          <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center mr-2">
-                            <BotIcon size={14} className="text-green-600" />
-                          </div>
-                          <span className="text-xs font-medium text-green-600">EcoGuide Assistant</span>
-                        </div>
-                      )}
-                      {message.sender === "user" && (
-                        <div className="flex items-center justify-end mb-1.5">
-                          <span className="text-xs font-medium text-gray-600">You</span>
-                          <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center ml-2">
-                            <UserIcon size={14} className="text-amber-600" />
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-sm whitespace-pre-line">{message.text}</p>
-                      <div
-                        className={`text-xs text-gray-500 mt-1 ${
-                          message.sender === "user" ? "text-right" : "text-left"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-[#E7F7E2] shadow-sm">
-                      <div className="flex items-center mb-1.5">
-                        <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center mr-2">
-                          <BotIcon size={14} className="text-green-600" />
-                        </div>
-                        <span className="text-xs font-medium text-green-600">EcoGuide Assistant</span>
-                      </div>
-                      <div className="flex space-x-1.5 items-center h-6">
-                        <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce"></div>
-                        <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                        <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              <div className="py-3 px-1 flex flex-wrap gap-2">
-                {suggestedPrompts.map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handlePromptClick(p.text)}
-                    className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs px-3 py-1.5 rounded-full transition-colors"
-                  >
-                    <span className="mr-1.5">{p.icon}</span>
-                    {p.text}
-                  </button>
-                ))}
-              </div>
-
-              <div className="border-t border-gray-200 pt-3 flex items-center">
-                <button className="p-2 text-gray-500 hover:text-gray-700">
-                  <MicIcon size={20} />
-                </button>
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                    placeholder="Ask anything about recycling..."
-                    className="w-full px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <button
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-[#FF8C42] text-white rounded-full hover:bg-orange-600 transition-colors"
-                    onClick={handleSendMessage}
-                  >
-                    <SendIcon size={16} />
-                  </button>
+              {chatLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-gray-500">Loading chat history...</p>
                 </div>
-                <button className="p-2 text-gray-500 hover:text-gray-700">
-                  <LightbulbIcon size={20} />
-                </button>
-              </div>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
+                    {chatMessages.map((message, i) => (
+                      <div key={i} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+                            message.sender === "user"
+                              ? "bg-[#FFF8E7] text-gray-800"
+                              : "bg-[#E7F7E2] text-gray-800"
+                          }`}
+                        >
+                          {message.sender === "ai" && (
+                            <div className="flex items-center mb-1.5">
+                              <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center mr-2">
+                                <BotIcon size={14} className="text-green-600" />
+                              </div>
+                              <span className="text-xs font-medium text-green-600">EcoGuide Assistant</span>
+                            </div>
+                          )}
+                          {message.sender === "user" && (
+                            <div className="flex items-center justify-end mb-1.5">
+                              <span className="text-xs font-medium text-gray-600">You</span>
+                              <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center ml-2">
+                                <UserIcon size={14} className="text-amber-600" />
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-sm whitespace-pre-line">{message.text}</p>
+                          <div
+                            className={`text-xs text-gray-500 mt-1 ${
+                              message.sender === "user" ? "text-right" : "text-left"
+                            }`}
+                          >
+                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {isTyping && (
+                      <div className="flex justify-start">
+                        <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-[#E7F7E2] shadow-sm">
+                          <div className="flex items-center mb-1.5">
+                            <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center mr-2">
+                              <BotIcon size={14} className="text-green-600" />
+                            </div>
+                            <span className="text-xs font-medium text-green-600">EcoGuide Assistant</span>
+                          </div>
+                          <div className="flex space-x-1.5 items-center h-6">
+                            <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce"></div>
+                            <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                            <div className="h-2 w-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <div className="py-3 px-1 flex flex-wrap gap-2">
+                    {suggestedPrompts.map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handlePromptClick(p.text)}
+                        className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs px-3 py-1.5 rounded-full transition-colors"
+                      >
+                        <span className="mr-1.5">{p.icon}</span>
+                        {p.text}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-3 flex items-center">
+                    <button className="p-2 text-gray-500 hover:text-gray-700">
+                      <MicIcon size={20} />
+                    </button>
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                        placeholder="Ask anything about recycling..."
+                        className="w-full px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-[#FF8C42] text-white rounded-full hover:bg-orange-600 transition-colors"
+                        onClick={handleSendMessage}
+                      >
+                        <SendIcon size={16} />
+                      </button>
+                    </div>
+                    <button className="p-2 text-gray-500 hover:text-gray-700">
+                      <LightbulbIcon size={20} />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </Card>
 

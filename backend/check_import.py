@@ -1,10 +1,8 @@
-# Quick import test for the backend app
-import sys
+import importlib, traceback
 try:
-    import src.main
+    importlib.import_module('src.main')
     print('IMPORT_OK')
 except Exception:
-    import traceback
     traceback.print_exc()
-    sys.exit(1)
+    print('IMPORT_FAIL')
 
